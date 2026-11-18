@@ -104,7 +104,11 @@
         <div class="read-sec-h">🙋 나의 성경 읽기 <small>혼자 하는 통독</small></div>
         <div class="progress"><div class="progress-bar" id="progressBar"></div></div>
         <div class="progress-txt" id="progressTxt"></div>
-        <div class="quiz-row"><button class="btn ghost sm" data-open-plan>📋 나의 통독표</button></div>
+        <div class="quiz-row"><button class="btn ghost sm" data-open-plan>📋 나의 통독표</button><button class="btn ghost sm" data-open-notes>🔖 말씀 노트</button></div>
+      </div>
+      <div class="read-sec">
+        <div class="read-sec-h">🗓 나의 읽기 계획 <small>잠언·복음서·신약·1년</small></div>
+        <div id="planCard" class="plan-card"></div>
       </div>
       <div class="read-sec">
         <div class="read-sec-h">👥 함께 성경 읽기 <small>청년 1부 · 2부 단체 통독</small></div>
@@ -126,12 +130,21 @@
     <div class="panel-body">
       <div class="notice-box"><div class="board-label">📢 청년 2부 공지</div><ul class="notice-list" data-notice-list></ul></div>
       <div data-ch hidden></div>
+      <div class="read-sec">
+        <div class="read-sec-h">🕊 5분 쉼 루틴 <small>숨 고르기 · 말씀 · 감사 · 기도</small></div>
+        <p class="tiny-help">바쁜 하루 중에 딱 5분, 하나님 앞에서 숨을 골라요.</p>
+        <button class="btn primary sm" data-rest-open>🕊 5분 쉬기 시작</button>
+      </div>
+      <div class="read-sec">
+        <div class="read-sec-h">🌱 4주 습관 챌린지 <small>왼쪽 벽 게시판</small></div>
+        <div id="habitMini"></div>
+      </div>
       <div class="quiz-box">
         <div class="board-label">🧩 성경 퀴즈 · 이번 주 랭킹</div>
         <ol class="mini-rank" data-quiz-top></ol>
         <div class="quiz-row"><span class="muted tiny" data-quiz-range></span><button class="btn primary sm quiz-open">🧩 퀴즈 풀기</button></div>
       </div>
-      <p class="welcome">원목 테이블에 둘러앉아 이야기 나누는 곳이에요. 의자·벤치·소파를 누르면 앉아요. 검은 소파에 앉은 다음 <b>🛌 눕기</b>로 누울 수 있고, 창문 옆 <b>방명록 보드</b>를 누르면 쪽지를 붙일 수 있어요.</p>
+      <p class="welcome">원목 테이블에 둘러앉아 이야기 나누는 곳이에요. 의자·벤치·소파를 누르면 앉아요. 검은 소파에 앉은 다음 <b>🛌 눕기</b>로 누울 수 있고, 창문 옆 <b>방명록 보드</b>를 누르면 쪽지를 붙일 수 있어요. 왼쪽 초록 벽의 <b>🌱 습관 챌린지 게시판</b>도 눌러 보세요.</p>
       <div class="board-label">📝 최근 방명록</div>
       <ul class="recent-list" data-gb-recent></ul>
       <button class="btn ghost sm gb-open">📝 방명록 전체 보기</button>
@@ -145,6 +158,19 @@
     <div class="panel-body">
       <div class="notice-box"><div class="board-label">📢 청년 1부 공지</div><ul class="notice-list" data-notice-list></ul></div>
       <div data-ch hidden></div>
+      <div class="read-sec">
+        <div class="read-sec-h">📚 같이 공부 <small>25분 집중 타이머</small></div>
+        <div id="studyBox"></div>
+      </div>
+      <div class="read-sec">
+        <div class="read-sec-h">💌 응원 기도 카드 <small>시험·면접·이사…</small></div>
+        <ul class="recent-list" data-cheer-mini></ul>
+        <button class="btn ghost sm" data-cheer-open="room301">💌 카드 쓰기 · 기도하기</button>
+      </div>
+      <div class="read-sec">
+        <div class="read-sec-h">🎉 파티 게임 <small>방에 있는 친구들과</small></div>
+        <div class="quiz-row"><button class="btn primary sm" data-party-open>⚖️ 밸런스 · 🕵️ 라이어 게임</button></div>
+      </div>
       <div class="quiz-box">
         <div class="board-label">🧩 성경 퀴즈 · 이번 주 랭킹</div>
         <ol class="mini-rank" data-quiz-top></ol>
@@ -162,18 +188,19 @@
     <div class="panel-body" id="showPanelBody"></div>
   </section>
   <section class="panel" id="panel-praise" data-room="praise">
-    <button class="panel-head" data-toggle>🎸 찬양팀 연습실 · 리빙리버 <span class="chev">▾</span></button>
+    <button class="panel-head" data-toggle>🎸 찬양팀 연습실 · 추천 찬양 <span class="chev">▾</span></button>
     <div class="panel-body">
-      <p class="welcome">바닥의 <b>동그라미</b>나 악기를 누르면 그 자리로 가서 연주할 수 있어요. 혼자 연습해도 되고, 같은 방 친구들과 <b>합주</b>도 돼요 (친구가 치는 소리가 들려요). <b>인도자</b> 자리에 서면 <b>키·빠르기</b>를 정할 수 있고, 모두의 코드 버튼이 그 키로 바뀌어요.</p>
-      <div class="board-label">🎶 지금 연주 중</div>
-      <ul class="recent-list" id="jamWho"></ul>
-      <div class="quiz-row"><button class="btn primary sm jam-pick">🎸 악기 고르기</button><button class="btn ghost sm cd-open">💿 리빙리버 CD 듣기</button></div>
-      <div class="board-label">🎼 이번 주 콘티</div>
-      <ol class="setlist" id="setList"></ol>
-      <button class="btn ghost sm songs-open">🎼 모든 곡 · 악보 보기</button>
-      <div class="board-label">📝 청년들의 추천 찬양</div>
+      <p class="welcome">요즘 은혜 받은 찬양을 <b>추천</b>하고, 친구들이 남긴 찬양을 <b>▶ 듣고 ❤️</b> 눌러 주세요. 이번 주 ❤️를 많이 받은 곡이 순위에 올라요. 악기·CD는 재미로 마음껏 쳐 보세요 🎸</p>
+      <div class="rec-hero">
+        <div class="board-label">🏆 추천 찬양 순위 <span class="seg mini rec-rank-seg"><button class="seg-btn active" data-rr="week">이번 주</button><button class="seg-btn" data-rr="all">전체</button></span></div>
+        <ol class="rec-rank" id="recRank"></ol>
+        <button class="btn primary sm rec-open">🎵 추천 찬양 남기기 · 듣기</button>
+      </div>
+      <div class="board-label">🆕 새로 올라온 추천</div>
       <ul class="recent-list" id="recRecent"></ul>
-      <button class="btn ghost sm rec-open">📝 추천 찬양 남기기 · 전체 보기</button>
+      <div class="board-label" style="margin-top:10px">🎸 재미로 연주해 봐요 · 지금 연주 중</div>
+      <ul class="recent-list" id="jamWho"></ul>
+      <div class="quiz-row"><button class="btn ghost sm jam-pick">🎸 악기 고르기</button><button class="btn ghost sm cd-open">💿 리빙리버 CD 듣기</button></div>
     </div>
   </section>
 
@@ -184,6 +211,7 @@
     <button class="hud-btn" id="zoomOut" title="멀리">－</button>
     <button class="hud-btn" id="resetView" title="시점 처음으로">⟲</button>
     <button class="hud-btn map-open" title="마당 지도 보기">🗺</button>
+    <button class="hud-btn" id="funBtn" title="놀기: 춤추기 · 친구에게 장난" hidden>🎭</button>
     <button class="hud-btn" id="liteBtn" title="가볍게 보기 (오래된 폰이 버벅일 때)">🪶</button>
   </div>
   <div class="people-pop" id="peoplePop" hidden>
@@ -191,6 +219,7 @@
     <ul id="peopleList"></ul>
     <p class="tiny-help">이름을 누르면 그 사람 쪽으로 화면이 움직여요.</p>
   </div>
+  <div class="people-pop fun-pop" id="funPop" hidden></div>
   <div class="carry-bar" id="carryBar" hidden>
     <span id="carryWhat"></span>
     <button class="btn primary sm" id="carryEat">😋 먹기</button>
@@ -201,6 +230,15 @@
   <div class="sport-bar skate-bar" id="skateBar" hidden></div>
   <div class="sport-bar fire-bar" id="fireBar" hidden></div>
   <div class="walk-card" id="walkCard" hidden></div>
+  <div class="walk-hud" id="walkHud" hidden></div>
+  <!-- 🎶 한밤의 청음회 -->
+  <div class="sport-bar listen-bar" id="listenBar" hidden></div>
+  <div class="cd-player listen-player" id="listenPlayer" hidden>
+    <div class="cd-player-head"><span class="cd-spin">🎶</span><b id="lpTitle"></b><button class="icon-btn" id="lpClose" title="그만 듣기">✕</button></div>
+    <div class="lp-now" id="lpNow"></div><div class="lp-next" id="lpNext"></div>
+    <div class="cd-frame" id="lpFrameWrap"></div>
+    <p class="lp-tip">모두 같은 곡을 같은 부분부터 들어요 · 소리가 안 나면 영상의 ▶를 눌러요</p>
+  </div>
   <!-- 🎸 연주판 (악기 자리에 서면 나와요) -->
   <div class="jam-bar" id="jamBar" hidden></div>
   <!-- 💿 친구가 튼 CD 같이 듣기 -->
@@ -281,6 +319,8 @@
   <div class="composer-row small">
     <button class="btn ghost gb-open">📝 방명록</button>
     <button class="btn ghost quiz-open">🧩 성경 퀴즈</button>
+    <button class="btn ghost" data-rest-open>🕊 5분 쉼</button>
+    <button class="btn ghost" data-habit-open>🌱 습관 챌린지</button>
     <span class="grow"></span>
     <button class="btn ghost lie-btn" hidden>🛌 눕기</button>
     <button class="btn ghost stand-btn" hidden>일어나기</button>
@@ -291,12 +331,11 @@
 <!-- 하단 입력창: 찬양팀 연습실 -->
 <footer class="composer" id="composer-praise" hidden>
   <div class="composer-row">
-    <input id="praiseInput" maxlength="60" placeholder="상태 메시지 (예: 이번 주 콘티 같이 맞춰봐요 🎶)" autocomplete="off">
+    <input id="praiseInput" maxlength="60" placeholder="상태 메시지 (예: 요즘 이 찬양에 꽂혔어요 🎶)" autocomplete="off">
     <button class="btn primary" id="praisePost">올리기</button>
   </div>
   <div class="composer-row small">
     <button class="btn ghost jam-pick">🎸 악기 고르기</button>
-    <button class="btn ghost songs-open">🎼 악보</button>
     <button class="btn ghost cd-open">💿 리빙리버 CD</button>
     <button class="btn ghost rec-open">📝 추천 찬양</button>
     <button class="btn ghost dance-btn">💃 춤추기</button>
@@ -331,6 +370,8 @@
   <div class="composer-row small">
     <button class="btn ghost gb-open">📝 방명록</button>
     <button class="btn ghost quiz-open">🧩 성경 퀴즈</button>
+    <button class="btn ghost" data-party-open>🎉 게임</button>
+    <button class="btn ghost" data-cheer-open="room301">💌 응원 카드</button>
     <span class="grow"></span>
     <button class="btn ghost lie-btn" hidden>🛌 눕기</button>
     <button class="btn ghost stand-btn" hidden>일어나기</button>
@@ -348,6 +389,51 @@
 </div>
 
 <!-- 💿 리빙리버 CD -->
+<div class="modal" id="cheerModal" hidden>
+  <div class="modal-card wide-card">
+    <div class="drawer-head"><h2 id="cheerTitle">💌 응원 기도 카드</h2><button class="icon-btn" data-close="cheerModal">✕</button></div>
+    <p class="muted">응원과 기도가 필요한 일을 짧게 적어요 (2주 뒤에 저절로 사라져요). 친구 카드에는 🙏를 눌러 함께 기도해요.</p>
+    <div class="composer-row"><input id="cheerTxt" maxlength="80" placeholder="예: 목요일 면접이에요! 떨지 않게 기도 부탁해요" autocomplete="off"><button class="btn primary" id="cheerPost">💌 붙이기</button></div>
+    <ul class="cheer-list" id="cheerList"></ul>
+  </div>
+</div>
+<div class="modal" id="partyModal" hidden>
+  <div class="modal-card wide-card">
+    <div class="drawer-head"><h2>🎉 파티 게임</h2><button class="icon-btn" data-close="partyModal">✕</button></div>
+    <div class="seg"><button class="seg-btn active" data-ptab="bal">⚖️ 밸런스 게임</button><button class="seg-btn" data-ptab="liar">🕵️ 라이어 게임</button></div>
+    <div id="partyBody" class="party-body"></div>
+  </div>
+</div>
+<div class="modal" id="restModal" hidden>
+  <div class="modal-card rest-card">
+    <div class="drawer-head"><h2>🕊 5분 쉼 루틴</h2><button class="icon-btn" data-close="restModal">✕</button></div>
+    <div id="restBody"></div>
+  </div>
+</div>
+<div class="modal" id="habitModal" hidden>
+  <div class="modal-card wide-card">
+    <div class="drawer-head"><h2>🌱 4주 습관 챌린지</h2><button class="icon-btn" data-close="habitModal">✕</button></div>
+    <div id="habitBody"></div>
+  </div>
+</div>
+<div class="modal" id="listenModal" hidden>
+  <div class="modal-card wide-card">
+    <div class="drawer-head"><h2>🎶 한밤의 청음회</h2><button class="icon-btn" data-close="listenModal">✕</button></div>
+    <p class="muted">누구나 찬양 30분을 골라 청음회를 열 수 있어요. 시간이 되면 마당 뒤 잔디밭 돗자리에 모여 <b>모두 같은 곡을 같은 부분부터</b> 함께 들어요. 예약하면 📅 모임 시간표에도 올라가요.</p>
+    <ul class="ls-list" id="listenList"></ul>
+    <button class="btn primary" id="lsNewBtn">＋ 청음회 예약하기</button>
+    <div class="ls-form" id="lsForm" hidden>
+      <label>제목 <input id="lsTitle" maxlength="40" placeholder="예: 늦가을 감사 찬양"></label>
+      <label>설명 (선택) <input id="lsDescr" maxlength="200" placeholder="어떤 마음으로 고른 곡들인지 한 줄"></label>
+      <label>시작 <input type="datetime-local" id="lsStart"></label>
+      <div class="board-label">🎵 찬양 고르기 (유튜브 링크)</div>
+      <div class="ls-add"><input id="lsLink" placeholder="https://youtu.be/…" autocomplete="off"><input id="lsSongTitle" maxlength="60" placeholder="곡 제목 (비우면 자동)"><button class="btn ghost" id="lsAddSong">곡 추가</button></div>
+      <ol class="ls-songs" id="lsSongs"></ol>
+      <p class="tiny-help" id="lsTotal"></p>
+      <div class="modal-actions"><button class="btn primary" id="lsSave">🎶 예약하기</button></div>
+    </div>
+  </div>
+</div>
 <div class="modal" id="cdModal" hidden>
   <div class="modal-card wide-card">
     <div class="drawer-head"><h2>💿 리빙리버 CD 선반</h2><button class="icon-btn" data-close="cdModal">✕</button></div>
@@ -420,7 +506,7 @@
 <div class="modal" id="recModal" hidden>
   <div class="modal-card wide-card">
     <div class="drawer-head"><h2>📝 청년들의 추천 찬양</h2><button class="icon-btn" data-close="recModal">✕</button></div>
-    <p class="muted">요즘 은혜 받은 찬양, 찬양팀이 같이 불렀으면 하는 곡을 남겨 주세요. 연습실 왼쪽 벽 보드에 붙어요 🎵</p>
+    <p class="muted">요즘 은혜 받은 찬양을 남기고, 친구들이 남긴 찬양을 ▶ 들어 보고 ❤️ 눌러 주세요. 이번 주 ❤️를 많이 받은 곡이 순위에 올라요 🎵</p>
     <div class="rec-form">
       <input id="recTitle" maxlength="40" placeholder="곡 제목 (꼭 적어 주세요) 예: 주 이름 찬양해" autocomplete="off">
       <input id="recArtist" maxlength="30" placeholder="부른 사람·팀 (선택) 예: 마커스" autocomplete="off">
@@ -432,7 +518,7 @@
       <span class="grow"></span>
       <button class="btn primary" id="recPost">추천하기 🎵</button>
     </div>
-    <div class="seg rec-sort"><button class="seg-btn active" data-sort="new">최신순</button><button class="seg-btn" data-sort="like">🙌 많이 받은 순</button></div>
+    <div class="seg rec-sort"><button class="seg-btn active" data-sort="new">최신순</button><button class="seg-btn" data-sort="like">❤️ 많이 받은 순</button></div>
     <ul class="gb-list" id="recList"></ul>
   </div>
 </div>
@@ -586,6 +672,7 @@
       <button class="icon-btn" data-close="readerModal">✕</button>
     </div>
     <div class="reader-body" id="rdBody"><p class="muted">불러오는 중…</p></div>
+    <div class="rd-pick" id="rdPick" hidden></div>
     <div class="reader-foot">
       <span class="muted tiny" id="rdNote">1분 넘게 읽으면 발자취에 자동으로 남아요 · 개역한글</span>
       <span class="grow"></span>
@@ -661,7 +748,7 @@
 <div class="modal" id="albumModal" hidden>
   <div class="modal-card wide-card">
     <div class="drawer-head"><h2>🌱 내 그루터기</h2><button class="icon-btn" data-close="albumModal">✕</button></div>
-    <div class="seg album-seg"><button class="seg-btn" data-atab="mission">🎯 미션</button><button class="seg-btn" data-atab="gift">🎁 선물·도감</button><button class="seg-btn" data-atab="skins">🎖 배지·스킨</button><button class="seg-btn" data-atab="record">📖 기록</button><button class="seg-btn" data-atab="walk">🌿 산책 노트</button><button class="seg-btn" data-atab="card">📸 나의 그루터기 카드</button></div>
+    <div class="seg album-seg"><button class="seg-btn" data-atab="mission">🎯 미션</button><button class="seg-btn" data-atab="gift">🎁 선물·도감</button><button class="seg-btn" data-atab="skins">🎖 배지·스킨</button><button class="seg-btn" data-atab="record">📖 기록</button><button class="seg-btn" data-atab="notes">🔖 말씀 노트</button><button class="seg-btn" data-atab="walk">🌿 산책 노트</button><button class="seg-btn" data-atab="card">📸 나의 그루터기 카드</button></div>
     <div id="albumBody" class="album-body"></div>
   </div>
 </div>
@@ -729,16 +816,25 @@
         <label class="chk"><input type="radio" name="ordPickup" value="church" checked> ⛪ 주일에 교회에서 받을게요</label>
         <label class="chk"><input type="radio" name="ordPickup" value="contact"> 📞 연락해서 정해요</label>
       </div>
+      <div class="board-label">📅 픽업 날짜</div>
+      <div class="ord-days" id="ordDays"></div>
       <label class="field">메모 (선택) <input id="ordMemo" maxlength="200" placeholder="예: 2부 예배 끝나고 받을게요"></label>
       <p class="muted tiny">🔒 이름·연락처는 판매자(관리자)만 볼 수 있어요. · 🥤 수익금은 청년부 음료수 회비로 쓰여요.</p>
       <button class="btn primary wide" id="ordSend">🧀 주문 보내기</button>
+      <button class="btn ghost wide" id="ordMineBtn" style="margin-top:6px">📦 내 주문 보기</button>
+    </div>
+    <div id="ordMine" hidden>
+      <div class="board-label">📦 내 주문</div>
+      <ul class="my-orders" id="ordMineList"></ul>
+      <p class="muted tiny">🆕 받음 → 📞 연락드림 → ✅ 전달 완료. 아직 연락 전(🆕)이면 여기서 취소할 수 있어요.</p>
+      <button class="btn ghost" id="ordBackBtn">← 주문하러 가기</button>
     </div>
     <div id="ordDone" class="ord-done" hidden>
       <div class="big">🧀🎉</div>
       <b>주문이 들어갔어요!</b>
       <p id="ordDoneTxt"></p>
       <p class="muted">확인하고 남겨 주신 연락처로 곧 연락드릴게요. 고마워요 💛</p>
-      <button class="btn ghost" data-close="orderModal">닫기</button>
+      <div class="modal-actions"><button class="btn ghost" id="ordDoneMine">📦 내 주문 보기</button><button class="btn ghost" data-close="orderModal">닫기</button></div>
     </div>
   </div>
 </div>
@@ -780,7 +876,7 @@
 <!-- 🌿 말씀 산책길: 끝에 오늘의 질문 -->
 <div class="modal" id="walkModal" hidden>
   <div class="modal-card">
-    <div class="drawer-head"><h2>🌿 오늘의 질문</h2><button class="icon-btn" data-close="walkModal">✕</button></div>
+    <div class="drawer-head"><h2 id="walkTitle">🌿 오늘의 질문</h2><button class="icon-btn" data-close="walkModal">✕</button></div>
     <div id="walkBody"></div>
   </div>
 </div>
@@ -810,6 +906,12 @@
 </div>
 
 <!-- 통독표 -->
+<div class="modal" id="rplanModal" hidden>
+  <div class="modal-card wide-card">
+    <div class="drawer-head"><h2>🗓 나의 읽기 계획</h2><button class="icon-btn" data-close="rplanModal">✕</button></div>
+    <div id="rplanBody"></div>
+  </div>
+</div>
 <div class="modal" id="planModal" hidden>
   <div class="modal-card wide-card">
     <div class="drawer-head">
@@ -843,9 +945,8 @@
       <div class="adm-sec" data-roles="all"><div id="adminSummary"></div></div>
       <div class="adm-sec" data-roles="all">
       <h3>🔑 비밀번호 관리</h3>
-      <p class="muted tiny">청년 1부 관리자: 1부 공지 · 301호(3Q) 퀴즈 · 1부 함께 성경 읽기만 · 찬양팀: 곡 악보만 관리할 수 있어요. 새 비밀번호를 적고 저장하면 바로 바뀌어요.</p>
+      <p class="muted tiny">청년 1부 관리자: 1부 공지 · 301호(3Q) 퀴즈 · 1부 함께 성경 읽기만 관리할 수 있어요. 새 비밀번호를 적고 저장하면 바로 바뀌어요.</p>
       <div class="composer-row small"><span style="min-width:96px">청년 1부 관리자</span><input type="password" id="pwG1" placeholder="새 비밀번호" autocomplete="new-password"><button class="btn ghost sm" data-pw-role="g1">저장</button></div>
-      <div class="composer-row small" style="margin-top:6px"><span style="min-width:96px">찬양팀</span><input type="password" id="pwPraise" placeholder="새 비밀번호" autocomplete="new-password"><button class="btn ghost sm" data-pw-role="praise">저장</button></div>
       <h3>📅 모임 시간표</h3>
       <div class="admin-form">
         <input id="evTitle" maxlength="60" placeholder="모임 이름 (예: 301호 보드게임 번개 🎲)">
@@ -922,13 +1023,10 @@
       </div>
       <p class="muted tiny">책을 하나도 안 고르고 저장하면 66권 전체에서 나와요. 고른 책에 직접 만든 문제가 모자라면 개역한글 본문으로 빈칸·장 맞히기 문제를 자동으로 만들어 채워요.</p>
       </div>
-      <div class="adm-sec" data-roles="all praise">
-      <h3>🎼 찬양팀 곡 악보</h3>
-      <p class="muted tiny">악보 사진 · 코드 · 유튜브를 곡마다 올리고, 이번 주 콘티 순서를 정해요.</p>
-      <button class="btn primary sm song-admin-open">🎼 곡 악보 관리 열기</button>
-      </div>
       <div class="adm-sec" data-roles="all">
       <h3>🧀 치즈멜로바이트 주문</h3>
+      <div class="board-label">📦 주일마다 만들 수 있는 수량 (비우면 제한 없음)</div>
+      <div id="stockAdmin" class="stock-admin"></div>
       <p class="muted tiny">손님 이름·연락처는 전체 관리자만 볼 수 있어요. 연락한 뒤 '📞 연락함', 건네면 '✅ 완료'를 눌러요.</p>
       <div class="composer-row small"><button class="btn primary sm" id="orderPushBtn">📱 이 기기로 주문 알림 받기</button><span class="muted tiny" id="orderPushState"></span></div>
       <p class="tiny" id="orderSum"></p>
