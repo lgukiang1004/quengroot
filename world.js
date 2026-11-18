@@ -1483,13 +1483,15 @@ function buildBackyard(s, seats, obs, clickables, labels) {
     ducks.push({ d, r: 0.45 + k * 0.17, sp: 0.18 + k * 0.05, ph: k * 2.1 });
   }
   labels.push({ x: L.x, y: 1.8, z: L.z, html: "💧 그루터기 호수" });
-  [[L.x - 1.6, L.z + L.rz + 1.8, Math.PI, "LB0"], [L.x + 1.8, L.z + L.rz + 1.8, Math.PI, "LB1"]].forEach(([x, z, ry, id]) => {
+  // 호숫가 벤치 2개 (호수 동쪽, 호수를 바라봐요) — 자리 LB0-0/1 · LB1-0/1
+  [[L.x + L.rx + 1.6, L.z + 1.2, -Math.PI / 2, "LB0"], [L.x + L.rx + 1.6, L.z - 1.6, -Math.PI / 2, "LB1"]].forEach(([x, z, ry, id]) => {
     const b = new T.Group(); b.position.set(x, 0, z); b.rotation.y = ry; g.add(b);
     box(b, 1.8, 0.07, 0.5, M("#a0703f", 0.8), 0, 0.45, 0); box(b, 1.8, 0.35, 0.06, M("#a0703f", 0.8), 0, 0.72, -0.24);
     for (const lx of [-0.8, 0.8]) box(b, 0.07, 0.45, 0.5, M("#3a3a3a", 0.5), lx, 0.22, 0);
     const ids = []; for (const k of [-0.42, 0.42]) { const sid = `${id}-${ids.length}`, c = Math.cos(ry), sn = Math.sin(ry), sx = x + k * c, sz = z - k * sn; seats[sid] = { x: sx, z: sz, rot: ry, h: 0.47, ax: sx + Math.sin(ry) * 0.75, az: sz + Math.cos(ry) * 0.75 }; ids.push(sid); }
-    seatGroupMark(b, ids); clickables.push(b); obs.push([x - 0.95, z - 0.3, x + 0.95, z + 0.3]);
+    seatGroupMark(b, ids); clickables.push(b); obs.push([x - 0.3, z - 0.95, x + 0.3, z + 0.95]);
   });
+  labels.push({ x: L.x + L.rx + 1.6, y: 1.5, z: L.z - 0.2, html: "🪑 호숫가 벤치 · 🪨 물수제비" });
   // 🔥 캠프파이어 (왼쪽): 돌 둘레 + 장작 + 불꽃 + 불빛 + 통나무 의자 8개 (CF-0~7)
   const F = FIRE;
   const pit = new T.Mesh(new T.CircleGeometry(4.2, 28), M("#8f8068", 0.95)); pit.rotation.x = -Math.PI / 2; pit.position.set(F.x, 0.018, F.z); pit.receiveShadow = true; g.add(pit);
@@ -1554,7 +1556,35 @@ function buildBackyard(s, seats, obs, clickables, labels) {
     for (const D of ducks) { const a2 = t * D.sp + D.ph, x = L.x + Math.cos(a2) * L.rx * D.r, z = L.z + Math.sin(a2) * L.rz * D.r; D.d.position.set(x, 0.02 + Math.sin(t * 2 + D.ph) * 0.015, z); D.d.rotation.y = -a2; }
     water.material.color.setHSL(0.55, 0.45, 0.56 + Math.sin(t * 0.8) * 0.02);
   };
-  return { signs, update, verses: null, done: -1, listenMat };
+  // 🪨 물수제비: 돌이 물 위를 통통 튀고, 튈 때마다 물결 동그라미
+  const skips = [], ripples = [], stoneM = M("#8d8a84", 0.6), ripM = new T.MeshBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0.7, depthWrite: false });
+  const inLake = (x, z) => ((x - L.x) / L.rx) ** 2 + ((z - L.z) / L.rz) ** 2 < 0.93;
+  const ripple = (x, z, big) => { const m = new T.Mesh(new T.RingGeometry(0.12, 0.17, 24), ripM.clone()); m.rotation.x = -Math.PI / 2; m.position.set(x, 0.05, z); g.add(m); ripples.push({ m, t0: performance.now(), big }); };
+  const skip = (fx, fz, ang, n) => {
+    const pts = [{ x: fx, z: fz, y: 1.0 }]; let x = fx, z = fz, step = 1.9;
+    const dx = Math.sin(ang), dz = Math.cos(ang);
+    // 물가에서 물 안쪽까지 날아가요
+    for (let k = 0; k < 40 && !inLake(x, z); k++) { x += dx * 0.25; z += dz * 0.25; }
+    x += dx * 0.6; z += dz * 0.6; pts.push({ x, z, y: 0.05, hop: true });
+    for (let i = 0; i < n; i++) { x += dx * step; z += dz * step; step = Math.max(0.45, step * 0.82); if (!inLake(x, z)) break; pts.push({ x, z, y: 0.05, hop: true }); }
+    const st = new T.Mesh(new T.SphereGeometry(0.07, 8, 6), stoneM); st.scale.set(1, 0.45, 1); st.position.set(fx, 1, fz); g.add(st);
+    skips.push({ st, pts, i: 0, u: 0, t: performance.now() });
+    return pts.length - 2; // 실제로 튄 횟수
+  };
+  const skipFrame = (dt) => {
+    for (let k = skips.length - 1; k >= 0; k--) {
+      const S = skips[k], a = S.pts[S.i], b = S.pts[S.i + 1];
+      if (!b) { ripple(a.x, a.z, true); g.remove(S.st); skips.splice(k, 1); continue; }
+      const len = Math.hypot(b.x - a.x, b.z - a.z), dur = S.i === 0 ? 0.45 : Math.max(0.12, len * 0.16);
+      S.u += dt / dur; const u = Math.min(1, S.u), hgt = S.i === 0 ? 0.6 : 0.12 + len * 0.18;
+      S.st.position.set(a.x + (b.x - a.x) * u, a.y + (b.y - a.y) * u + Math.sin(u * Math.PI) * hgt, a.z + (b.z - a.z) * u); S.st.rotation.y += dt * 20;
+      if (S.u >= 1) { S.u = 0; S.i++; ripple(b.x, b.z, false); }
+    }
+    const now = performance.now();
+    for (let k = ripples.length - 1; k >= 0; k--) { const R = ripples[k], e = (now - R.t0) / 1000, life = R.big ? 2.2 : 1.4; if (e > life) { g.remove(R.m); R.m.geometry.dispose(); R.m.material.dispose(); ripples.splice(k, 1); continue; } const sc = 1 + e * (R.big ? 7 : 5); R.m.scale.set(sc, sc, 1); R.m.material.opacity = 0.7 * (1 - e / life); }
+  };
+  const upd0 = update;
+  return { signs, update: (dt, t) => { upd0(dt, t); skipFrame(dt); }, verses: null, done: -1, listenMat, skip };
 }
 
 /* ---------------- 게시판 그림 (모임 시간표 · 운동장 랭킹) ---------------- */
@@ -3426,7 +3456,7 @@ function buildPraise() {
 // 누운 자세 회전: 몸(위쪽) → 소파 길이 방향, 얼굴(앞쪽) → 하늘
 const LIE_Q = new T.Quaternion().setFromRotationMatrix(new T.Matrix4().makeBasis(new T.Vector3(0, 0, 1), new T.Vector3(1, 0, 0), new T.Vector3(0, 1, 0)));
 const World = {
-  ver: "2026-11-18j", // 🔖 app.js의 WORLD_VER와 같아야 해요 (다르면 화면 위에 '파일이 덜 올라갔어요' 안내)
+  ver: "2026-11-18k", // 🔖 app.js의 WORLD_VER와 같아야 해요 (다르면 화면 위에 '파일이 덜 올라갔어요' 안내)
   LOOK, safeLook, makeCharacter, poseCharacter,
   renderer: null, camera: null, rooms: {}, room: null, roomName: null,
   actors: new Map(), hooks: null, el: null, overlay: null,
@@ -3715,6 +3745,9 @@ const World = {
     for (const sg of B.signs) { const done = sg.i < dn, old = sg.mat.map; sg.mat.map = walkSignTex(vs[sg.i], sg.i, done); sg.mat.needsUpdate = true; old && old.dispose(); sg.on = done; sg.glow.material.emissiveIntensity = done ? 1 : 0; sg.frame.color.set(done ? "#e0a92a" : "#8a6a44"); }
   },
   setHabitBoard(rows) { this.habitRows = rows; const r = this.rooms.vision; if (!r || !r.habitMat) return; const key = JSON.stringify(rows); if (r.hkey === key) return; r.hkey = key; const old = r.habitMat.map; r.habitMat.map = habitBoardTex(rows); r.habitMat.needsUpdate = true; old && old.dispose(); },
+  // 🪨 물수제비 던지기 (모두의 화면에서 같은 돌): 던진 사람 위치·방향·튈 횟수
+  skipStone(id, x, z, ang, n) { const r = this.rooms.yard; if (!r || !r.backyard || this.roomName !== "yard") return 0; this.prank(id, "push"); return r.backyard.skip(x, z, ang, n); },
+  lakeShore(x, z) { const e = Math.hypot((x - LAKE.x) / LAKE.rx, (z - LAKE.z) / LAKE.rz); return e > 0.95 && e < 1.75; },
   camYaw() { return this.cam ? this.cam.yaw : 0; },
   FIRE, WALK, ZONES, LISTEN, LAKE,
   // 🎶 청음회 안내판
@@ -3862,22 +3895,23 @@ const World = {
     const P = a.prank; if (!P) return;
     const e = (performance.now() - P.t0) / 1000, c = a.ch, g = c.group;
     const dur = { poke: 1.0, push: 0.6, trip: 2.2, sweep: 0.7 }[P.k] || 1;
-    if (e > dur) { a.prank = null; g.rotation.x = 0; g.rotation.z = 0; g.position.y = 0; c.head.rotation.set(0, 0, 0); c.body.rotation.set(0, 0, 0); return; }
+    if (e > dur) { a.prank = null; g.rotation.x = 0; g.rotation.z = 0; g.position.y = 0; g.position.z = 0; c.head.rotation.set(0, 0, 0); c.body.rotation.set(0, 0, 0); return; }
     if (P.k === "poke") { // 화들짝! 깡충 + 고개 휙
       const q = Math.min(1, e * 6); g.position.y = e < 0.3 ? Math.sin(e / 0.3 * Math.PI) * 0.18 : 0;
       c.head.rotation.y = (e < 0.5 ? 1 : Math.max(0, 1 - (e - 0.5) * 2)) * 0.9 * q; c.body.rotation.z = Math.sin(e * 30) * 0.06 * (1 - e);
       c.armL.rotation.set(-0.4, 0, 0.6 * q); c.armR.rotation.set(-0.4, 0, -0.6 * q);
     } else if (P.k === "push") { const q = Math.sin(Math.min(1, e / 0.6) * Math.PI); c.armR.rotation.set(-1.5 * q, 0, -0.1); c.body.rotation.y = -0.25 * q; }
     else if (P.k === "sweep") { const q = Math.sin(Math.min(1, e / 0.7) * Math.PI); c.legR.rotation.set(-0.2, 0, -0.9 * q); g.rotation.z = 0.12 * q; c.armL.rotation.set(0, 0, 0.6 * q); }
-    else if (P.k === "trip") { // 휘청 → 앞으로 꽈당 → 툭툭 털고 일어나기
+    else if (P.k === "trip") { // 휘청 → 뒤로 벌러덩 → 툭툭 털고 일어나기 (땅 위에 눕도록)
       let f;
-      if (e < 0.35) f = Math.sin(e / 0.35 * Math.PI / 2) * 0.35 + Math.sin(e * 40) * 0.05;
-      else if (e < 0.7) f = 0.35 + (e - 0.35) / 0.35 * 1.05;
-      else if (e < 1.5) f = 1.4;
-      else f = 1.4 * (1 - (e - 1.5) / 0.7);
-      g.rotation.x = f; g.position.y = -Math.min(0.35, f * 0.22);
-      const ar = Math.min(1, f / 1.4); c.armL.rotation.set(-2.2 * ar, 0, 0.4); c.armR.rotation.set(-2.2 * ar, 0, -0.4);
-      c.legL.rotation.x = 0.4 * ar; c.legR.rotation.x = -0.3 * ar; c.head.rotation.x = -0.5 * ar;
+      if (e < 0.3) f = Math.sin(e / 0.3 * Math.PI / 2) * 0.25 + Math.sin(e * 40) * 0.04;
+      else if (e < 0.65) f = 0.25 + (e - 0.3) / 0.35 * 1.3;
+      else if (e < 1.5) f = 1.55;
+      else f = 1.55 * (1 - (e - 1.5) / 0.7);
+      const ar = Math.min(1, f / 1.55);
+      g.rotation.x = -f; g.position.y = 0.16 * ar; g.position.z = -0.1 * ar;
+      c.armL.rotation.set(-2.6 * ar, 0, 0.6 * ar); c.armR.rotation.set(-2.6 * ar, 0, -0.6 * ar);
+      c.legL.rotation.x = -0.7 * ar; c.legR.rotation.x = -0.35 * ar; c.head.rotation.x = 0.35 * ar;
     }
   },
   dancePose(a, seated, walking, t) {
@@ -4187,11 +4221,11 @@ const World = {
     window.addEventListener("keyup", (e) => this.keys.delete(e.key.toLowerCase()));
     window.addEventListener("blur", () => this.keys.clear());
   },
-  setDist(d) { const c = this.room.cam; this.cam.dist = Math.max(c.min, Math.min(c.max, d)); },
+  setDist(d) { const c = this.room.cam; this.cam.dist = Math.max(Math.min(c.min, 1.8), Math.min(c.max, d)); },
   clampCam() {
     const c = this.room.cam;
-    this.cam.pitch = Math.max(0.12, Math.min(1.25, this.cam.pitch));
-    if (c.yawLimit) { const m = this.camCenter || 0; this.cam.yaw = Math.max(m - c.yawLimit, Math.min(m + c.yawLimit, this.cam.yaw)); }
+    // 2026-11-18: 마음대로 빙 돌려 보기 (내 앞모습도) · 아래로는 땅 밑으로 안 내려가게(아래 카메라 높이에서 막아요)
+    this.cam.pitch = Math.max(-0.45, Math.min(1.35, this.cam.pitch)); void c;
   },
   resetView() { const c = this.room.cam; this.cam.yaw = this.camCenter || 0; this.cam.pitch = c.pitch; this.cam.dist = c.dist; this.focusId = null; },
   tap(cx, cy) {
@@ -4387,6 +4421,7 @@ const World = {
       px = Math.max(-ins.hx, Math.min(ins.hx, px)); pz = Math.max(ins.z0, pz);
       if (pz < ins.z1 + 0.4) { const roofY = ins.wall + (ins.ridge - ins.wall) * (1 - Math.abs(px) / (ins.hx + 0.5)) - 0.6; py = Math.min(py, roofY); }
     }
+    py = Math.max(py, 0.3); // 땅 밑으로는 안 내려가요
     cam.position.set(px, py, pz); cam.lookAt(this.cam.target);
     // 카메라 쪽 벽 숨기기 / 천장
     if (r.wallHide) for (const w of r.wallHide) w.g.visible = (w.nx * px + w.nz * pz) > w.d - 0.01;
