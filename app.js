@@ -5,6 +5,9 @@ const CFG = window.APP_CONFIG || {};
 const VERSES = window.VERSES || [];
 const BOOKS = window.BOOKS || [];
 const W = window.World;
+// 🔖 world.js가 같이 올라갔는지 확인 (깃허브에 app.js만 올라가고 world.js가 옛날 것이면 지도·뒷마당이 안 바뀌어요)
+const WORLD_VER = "2026-11-18j";
+if (!W || W.ver !== WORLD_VER) setTimeout(() => { const b = document.createElement("div"); b.className = "ver-warn"; b.textContent = `⚠️ 사이트 파일이 덜 올라갔어요: world.js가 옛날 버전이에요 (지금 ${W && W.ver ? W.ver : "옛날 것"} · 필요한 것 ${WORLD_VER}). 깃허브에 world.js를 다시 올려 주세요.`; document.body.append(b); }, 1500);
 const LIMIT = { bubble: 80, status: 60, wall: 200, name: 12 };
 // 코드 안의 방 이름: yard = 마당, worship = 본당(기도하는 공간), cafe = 성경 읽는 공간, vision = 비전, room301 = 301호, praise = 찬양팀 연습실(리빙리버)
 const ROOMS = ["yard", "worship", "cafe", "vision", "room301", "praise", "showroom"]; // showroom = 🧀 치즈멜로바이트 쇼룸 (마당에서 문으로 들어가요, 위쪽 탭은 없음)
@@ -5715,10 +5718,10 @@ function renderMap() {
   el("rect", { x: -37, y: -45, width: 92, height: 68, fill: "#cfe6b8" });
   el("rect", { x: 35, y: -36, width: 16, height: 30, fill: "#e4f4fb", stroke: "#fbfbf7", "stroke-width": 0.5, rx: 3 }); // ⛸ 스케이트장
   el("ellipse", { cx: 43, cy: -21, rx: 5.4, ry: 11.8, fill: "none", stroke: "#d9483b", "stroke-width": 0.2 });
-  { const pts = []; for (let k = 0; k <= 60; k++) { const p = W.WALK.at(k / 60); pts.push(p.x.toFixed(2) + "," + p.z.toFixed(2)); } el("polyline", { points: pts.join(" "), fill: "none", stroke: "#e2d4b8", "stroke-width": 1.0, "stroke-linecap": "round", "stroke-linejoin": "round" }); } // 🌿 꼬불꼬불 산책길
-  el("ellipse", { cx: W.LAKE.x, cy: W.LAKE.z, rx: W.LAKE.rx, ry: W.LAKE.rz, fill: "#8cc7e0" }); el("text", { x: W.LAKE.x, y: W.LAKE.z + 0.8, class: "mt", "text-anchor": "middle" }, "💧 호수");
+  if (W.WALK && W.WALK.at) { const pts = []; for (let k = 0; k <= 60; k++) { const p = W.WALK.at(k / 60); pts.push(p.x.toFixed(2) + "," + p.z.toFixed(2)); } el("polyline", { points: pts.join(" "), fill: "none", stroke: "#e2d4b8", "stroke-width": 1.0, "stroke-linecap": "round", "stroke-linejoin": "round" }); } // 🌿 꼬불꼬불 산책길
+  if (W.LAKE) el("ellipse", { cx: W.LAKE.x, cy: W.LAKE.z, rx: W.LAKE.rx, ry: W.LAKE.rz, fill: "#8cc7e0" }); if (W.LAKE) el("text", { x: W.LAKE.x, y: W.LAKE.z + 0.8, class: "mt", "text-anchor": "middle" }, "💧 호수");
   el("circle", { cx: W.FIRE.x, cy: W.FIRE.z, r: 3.4, fill: "#e8d9b8" }); el("circle", { cx: W.FIRE.x, cy: W.FIRE.z, r: 0.9, fill: "#ff8a3c" }); // 🔥 캠프파이어
-  el("ellipse", { cx: W.LISTEN.x, cy: W.LISTEN.z, rx: 6.4, ry: 5.2, fill: "#9fd07a" }); el("rect", { x: W.LISTEN.x - 2.1, y: W.LISTEN.z + 4.4, width: 4.2, height: 0.5, fill: "#2e2a3a" }); // 🎶 청음회 잔디밭
+  if (W.LISTEN) el("ellipse", { cx: W.LISTEN.x, cy: W.LISTEN.z, rx: 6.4, ry: 5.2, fill: "#9fd07a" }); if (W.LISTEN) el("rect", { x: W.LISTEN.x - 2.1, y: W.LISTEN.z + 4.4, width: 4.2, height: 0.5, fill: "#2e2a3a" }); // 🎶 청음회 잔디밭
   el("text", { x: 0, y: -43.6, class: "mt", "text-anchor": "middle" }, "🌿 뒷마당 · 산책길 · 캠프파이어 · 청음회");
   el("rect", { x: 20.6, y: -19.2, width: 11.4, height: 14.4, fill: "#3f7f63", stroke: "#fff", "stroke-width": 0.25, rx: 0.4 }); // 🏀 농구장
   el("rect", { x: -32.7, y: -1.2, width: 4.2, height: 13, fill: "#e2d6bf" }); // 🍢 골목

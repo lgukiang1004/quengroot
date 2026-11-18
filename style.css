@@ -1072,3 +1072,4 @@ body.jamming #composer-praise { display: none; }
 .ord-days p { grid-column: 1 / -1; margin: 0; }
 .my-orders li button { justify-self: start; }
 .habit-grid { max-width: 360px; margin: 12px auto; }
+.ver-warn { position: fixed; left: 0; right: 0; top: 0; z-index: 9999; background: #d9483b; color: #fff; font-weight: 700; padding: 10px 14px; text-align: center; font-size: 14px; }
