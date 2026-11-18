@@ -1,0 +1,17 @@
+{
+  "name": "퀸장그루터기",
+  "short_name": "그루터기",
+  "description": "그루터기모여라 · 퀸즈 장로교회 청년부가 함께 기도하고 말씀 읽는 온라인 공간",
+  "lang": "ko",
+  "start_url": "./?app=1",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#fbf3e4",
+  "theme_color": "#fffdf8",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
