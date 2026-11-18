@@ -157,6 +157,10 @@
     </div>
   </section>
 
+  <section class="panel" id="panel-showroom" data-room="showroom" hidden>
+    <button class="panel-head" data-toggle>🧀 치즈멜로바이트 쇼룸 <span class="chev">▾</span></button>
+    <div class="panel-body" id="showPanelBody"></div>
+  </section>
   <section class="panel" id="panel-praise" data-room="praise">
     <button class="panel-head" data-toggle>🎸 찬양팀 연습실 · 리빙리버 <span class="chev">▾</span></button>
     <div class="panel-body">
@@ -194,6 +198,7 @@
     <button class="btn ghost sm" id="carryDrop" title="내려놓기">✕</button>
   </div>
   <div class="sport-bar" id="sportBar" hidden></div>
+  <div class="sport-bar skate-bar" id="skateBar" hidden></div>
   <!-- 🎸 연주판 (악기 자리에 서면 나와요) -->
   <div class="jam-bar" id="jamBar" hidden></div>
   <!-- 💿 친구가 튼 CD 같이 듣기 -->
@@ -297,6 +302,21 @@
     <span class="grow"></span>
     <button class="btn ghost stand-btn" hidden>일어나기</button>
     <button class="btn ghost" id="praiseClear">말풍선 지우기</button>
+  </div>
+</footer>
+
+<!-- 하단 입력창: 🧀 치즈멜로바이트 쇼룸 -->
+<footer class="composer" id="composer-showroom" hidden>
+  <div class="composer-row">
+    <input id="showInput" maxlength="60" placeholder="상태 메시지 (예: 450g 두 박스 찜 🧀)" autocomplete="off">
+    <button class="btn primary" id="showPost">올리기</button>
+  </div>
+  <div class="composer-row small">
+    <button class="btn ghost" data-order-open>🛒 주문하기</button>
+    <button class="btn ghost" data-cookie-play>🎮 쫀득쿠키 만들기</button>
+    <span class="grow"></span>
+    <button class="btn ghost stand-btn" hidden>일어나기</button>
+    <button class="btn ghost" id="showClear">말풍선 지우기</button>
   </div>
 </footer>
 
@@ -639,8 +659,24 @@
 <div class="modal" id="albumModal" hidden>
   <div class="modal-card wide-card">
     <div class="drawer-head"><h2>🌱 내 그루터기</h2><button class="icon-btn" data-close="albumModal">✕</button></div>
-    <div class="seg album-seg"><button class="seg-btn" data-atab="mission">🎯 미션</button><button class="seg-btn" data-atab="skins">🎖 배지·스킨</button><button class="seg-btn" data-atab="record">📖 기록</button><button class="seg-btn" data-atab="card">🗓 올해 카드</button></div>
+    <div class="seg album-seg"><button class="seg-btn" data-atab="mission">🎯 미션</button><button class="seg-btn" data-atab="gift">🎁 선물·도감</button><button class="seg-btn" data-atab="skins">🎖 배지·스킨</button><button class="seg-btn" data-atab="record">📖 기록</button><button class="seg-btn" data-atab="card">📸 나의 그루터기 카드</button></div>
     <div id="albumBody" class="album-body"></div>
+  </div>
+</div>
+<!-- 🎁 오늘의 선물 -->
+<div class="modal" id="giftModal" hidden>
+  <div class="modal-card">
+    <div class="drawer-head"><h2>🎁 오늘의 선물</h2><button class="icon-btn" data-close="giftModal">✕</button></div>
+    <div id="giftBody" class="gift-body"></div>
+  </div>
+</div>
+<!-- 🌱 오늘의 그루터기 (그날 처음 들어올 때 한 번) -->
+<div class="modal" id="welcomeModal" hidden>
+  <div class="modal-card welcome-card">
+    <div class="drawer-head"><h2 id="wcTitle">🌱 오늘의 그루터기</h2><button class="icon-btn" data-close="welcomeModal">✕</button></div>
+    <div id="wcBody" class="wc-body"></div>
+    <div class="wc-nav"><button class="icon-btn" id="wcPrev">‹</button><span id="wcDots"></span><button class="icon-btn" id="wcNext">›</button></div>
+    <button class="btn ghost wide" id="wcClose">오늘 그만 보기</button>
   </div>
 </div>
 <!-- 🧦 마당 광고판 -->
@@ -723,6 +759,7 @@
           <div class="sub">발자국<div class="chips" id="trailPick"></div></div>
           <div class="sub">따라다니는 고양이 (마당)<div class="chips" id="petPick"></div></div>
           <div class="sub">이름표 배지<div class="chips" id="badgePick"></div></div>
+          <div class="sub">이름표 칭호 (미션 도장)<div class="chips" id="titlePick"></div></div>
         </div>
       </div>
     </div>

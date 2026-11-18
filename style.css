@@ -773,3 +773,47 @@ body.jamming #composer-praise { display: none; }
 .cm-board .cook-result b { color: #8a3a10; font-size: 18px; }
 .cm-board .cook-result p { color: #6b4a2a; }
 .ad-img { display: block; width: 100%; max-height: 60vh; object-fit: contain; border-radius: 12px; background: #fff; margin-bottom: 8px; }
+
+/* ================= 🎁 오늘의 선물 · 🌱 오늘의 그루터기 · ⛸ 스케이트 (2026-11-18) ================= */
+.gift-body { text-align: center; }
+.gift-box { font-size: 86px; border: 0; background: none; cursor: pointer; animation: gift-shake 1.2s ease-in-out infinite; display: block; margin: 10px auto; }
+.gift-box.open { animation: gift-pop .6s ease-out forwards; }
+@keyframes gift-shake { 0%, 100% { transform: rotate(0); } 20% { transform: rotate(-8deg); } 40% { transform: rotate(8deg); } 60% { transform: rotate(-4deg); } }
+@keyframes gift-pop { to { transform: scale(1.6); opacity: 0; } }
+.gift-wow { font-size: 18px; font-weight: 700; color: #b8703e; }
+.gift-card { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 8px 0; }
+.gift-card.rare { background: linear-gradient(135deg, #fff8e1, #f3e5ff); border-color: #d4b0f0; box-shadow: 0 0 0 2px #f2c84b inset; }
+.gift-card .gc-tag { font-size: 11.5px; font-weight: 700; color: #8e44ad; }
+.gift-card:not(.rare) .gc-tag { color: #c0582a; }
+.gift-card .gc-em { font-size: 44px; line-height: 1; }
+.gift-card .gc-ref { margin: 0; font-size: 13px; color: var(--muted); }
+.gift-open { margin: 8px 0; }
+.gift-now { background: #fff8e6; border-radius: 10px; padding: 8px 10px; font-size: 13px; margin: 8px 0; }
+.stamp-next { font-size: 12.5px; margin: 8px 0; display: grid; gap: 4px; }
+.dex { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; }
+.dex-item { border: 1px dashed var(--line); background: #f6f2ec; border-radius: 12px; padding: 8px 4px; display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; }
+.dex-item .em { font-size: 26px; }
+.dex-item b { font-size: 12.5px; }
+.dex-item small { font-size: 10.5px; color: var(--muted); }
+.dex-item.got { background: #fff; border-style: solid; border-color: #d4b0f0; }
+.chip.dim { opacity: .55; }
+.ov .name.gold { background: linear-gradient(90deg, #f7d774, #f2c84b, #f7d774); color: #5a3a00; box-shadow: 0 0 0 2px #fff6c8, 0 1px 6px rgba(180,130,0,.45); }
+.welcome-card { width: min(420px, 100%); }
+.wc-body { min-height: 300px; }
+.wc-h { font-weight: 700; font-size: 16px; margin: 2px 0 8px; display: flex; align-items: center; gap: 6px; }
+.wc-verse { background: #fbf6ee; border-radius: 12px; padding: 10px 12px; margin-top: 8px; }
+.wc-verse p { margin: 0 0 4px; font-family: "Gowun Batang", serif; font-size: 14px; line-height: 1.6; }
+.wc-verse small { color: var(--muted); }
+.wc-tip { background: #eef7e8; border-radius: 10px; padding: 8px 10px; font-size: 13px; margin: 8px 0; }
+.wc-nav { display: flex; align-items: center; justify-content: space-between; margin: 10px 0; }
+.wc-nav span { display: flex; gap: 6px; }
+.wc-nav i { width: 8px; height: 8px; border-radius: 50%; background: #e2d6c4; cursor: pointer; }
+.wc-nav i.on { background: var(--accent); width: 20px; border-radius: 4px; }
+.ad-tag { margin-left: auto; font-size: 10.5px; color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; font-weight: 400; }
+.al-card-wrap { min-height: 120px; }
+.show-prices button.pc { border: 0; cursor: pointer; font: inherit; }
+.skate-bar { background: #1f4f6e; }
+.skate-bar .sk-foot { min-width: 96px; font-size: 16px; padding: 10px 14px; touch-action: manipulation; user-select: none; }
+.skate-bar .sk-foot.hit { transform: scale(.92); filter: brightness(1.2); }
+.sk-prog { flex: 1 1 120px; height: 10px; background: rgba(255,255,255,.25); border-radius: 99px; overflow: hidden; min-width: 100px; }
+.sk-prog i { display: block; height: 100%; background: linear-gradient(90deg, #7fd3ff, #ffffff); }

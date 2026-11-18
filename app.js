@@ -7,8 +7,8 @@ const BOOKS = window.BOOKS || [];
 const W = window.World;
 const LIMIT = { bubble: 80, status: 60, wall: 200, name: 12 };
 // 코드 안의 방 이름: yard = 마당, worship = 본당(기도하는 공간), cafe = 성경 읽는 공간, vision = 비전, room301 = 301호, praise = 찬양팀 연습실(리빙리버)
-const ROOMS = ["yard", "worship", "cafe", "vision", "room301", "praise"];
-const ROOM_NAME = { yard: "마당", worship: "본당", cafe: "성경 읽는 공간", vision: "비전", room301: "301호 · 3Q", praise: "찬양팀 연습실" };
+const ROOMS = ["yard", "worship", "cafe", "vision", "room301", "praise", "showroom"]; // showroom = 🧀 치즈멜로바이트 쇼룸 (마당에서 문으로 들어가요, 위쪽 탭은 없음)
+const ROOM_NAME = { yard: "마당", worship: "본당", cafe: "성경 읽는 공간", vision: "비전", room301: "301호 · 3Q", praise: "찬양팀 연습실", showroom: "치즈멜로 쇼룸" };
 const SITE_TITLE = CFG.siteTitle || "퀸장그루터기";
 
 /* ================= 유틸 ================= */
@@ -111,7 +111,12 @@ const DEMO_BOTS = {
     { name: "마리아", color: "#e8a87c", hair: "long", hairColor: "#5a3a26", glasses: "square", gender: "f", item: "coffee", bubble: "", pos: { x: 5.6, z: -1.5 } },
   ],
 };
+DEMO_BOTS.showroom = [
+  { name: "은혜", color: "#85b8a0", hair: "long", hairColor: "#2b2220", glasses: "none", gender: "f", bubble: "치즈 모형 너무 귀여워요 🧀", pos: { x: -1.8, z: 2.4 } },
+  { name: "요셉", color: "#7fb3c9", hair: "short", hairColor: "#2b2220", glasses: "round", gender: "m", apron: "cheese", bubble: "🧀 쫀득쿠키 만드는 중!", seat: "CM-1" },
+];
 const DEMO_WALK = {
+  showroom: [{ pos: { x: -4.4, z: -1.0 } }, { pos: { x: -2.0, z: 2.6 } }, { pos: { x: 1.8, z: 2.6 } }],
   yard: [{ pos: { x: -3, z: 1 } }, { pos: { x: 8.5, z: 3 } }, { sled: 1 }, { seat: "B2-0" }, { pos: { x: -12, z: 9 } }],
   worship: [{ seat: "PR0-0" }, { pos: { x: 2.5, z: -8.6 }, praying: true }, { seat: "PL7-5" }, { pos: { x: -8, z: 9 } }],
   cafe: [{ seat: "A-0" }, { pos: { x: -2, z: 3.5 } }, { seat: "T4-2" }, { pos: { x: 5.5, z: -2 } }],
@@ -719,7 +724,7 @@ const S = {
   myGb: store.get("myGb", []),
   gb: {},
 };
-const REACT = { yard: ["👋", "반가워요"], worship: ["🙏", "함께 기도해요"], cafe: ["💛", "공감해요"], vision: ["👋", "반가워요"], room301: ["😊", "좋아요"], praise: ["👏", "박수"] };
+const REACT = { showroom: ["🧀", "맛있겠다"], yard: ["👋", "반가워요"], worship: ["🙏", "함께 기도해요"], cafe: ["💛", "공감해요"], vision: ["👋", "반가워요"], room301: ["😊", "좋아요"], praise: ["👏", "박수"] };
 // 🎸 찬양팀 연습실 상태 (키·빠르기·음색은 이 기기에 기억해요)
 const JAM = {
   key: Math.max(0, Math.min(11, store.get("jamKey", 7))), bpm: Math.max(50, Math.min(180, store.get("jamBpm", 72))),
@@ -743,6 +748,8 @@ function meState() {
     ground: S.room === "yard" && S.ground && !S.seat,
     bball: BB.holder === myId, bbSeq: BB.seq,
     jam: S.room === "praise" ? jamPresence() : null,
+    skr: S.room === "yard" && typeof SK !== "undefined" ? skState() : null, // ⛸ 경주 중
+    fig: S.room === "yard" && S.fig ? S.fig : null,                         // ⛸ 피겨 기술
     cd: S.room === "praise" ? S.cdShare || null : null,
     amens: S.amens, joinedAt: S.joinedAt,
     pos: S.pos, seat: S.seat,
@@ -759,7 +766,7 @@ function refreshMe() {
 function renderOverlay(ov, p, mine) {
   const text = clip(p.bubble, LIMIT.bubble + 40);
   const reacted = S.reactedLive.has(p.id + "|" + text);
-  const key = [text, p.name, p.amens, reacted, mine, !!p.praying, S.room, p.badge, p.book].join("|");
+  const key = [text, p.name, p.amens, reacted, mine, !!p.praying, S.room, p.badge, p.book, p.title].join("|");
   if (ov.dataset.key === key) return;
   ov.dataset.key = key;
   ov.classList.toggle("mine", mine);
@@ -775,8 +782,8 @@ function renderOverlay(ov, p, mine) {
       }, emo, h("span", { text: String(Math.max(0, Number(p.amens) || 0)) })))));
   }
   if (p.praying) ov.append(h("div", { class: "praying-tag", text: "🙏 기도중" }));
-  const tags = [p.book, p.badge].filter((x) => typeof x === "string" && x).map((x) => h("span", { class: "ntag", text: clip(x, 18) }));
-  ov.append(h("div", { class: "name" }, name, ...tags));
+  const tags = [typeof p.title === "string" && TITLE_TXT[p.title], p.book, p.badge].filter((x) => typeof x === "string" && x).map((x) => h("span", { class: "ntag", text: clip(x, 18) }));
+  ov.append(h("div", { class: "name" + (p.title === "tree" ? " gold" : "") }, name, ...tags));
 }
 function renderPeople() {
   W.sync(S.peers);
@@ -893,6 +900,7 @@ const roomHandlers = {
 let worldReady = false, visitTimer = null;
 function joinRoom(room, from) {
   if (S.room === "yard" && room !== "yard" && BB.holder === myId) bbDrop(); // 공은 운동장에 두고 가요
+  if (typeof SK !== "undefined" && SK.race) { SK.race = null; W.raceMe = null; W.keyBlock = false; clearInterval(SK.tick); }
   if (!$("#cookModal").hidden) closeModal("cookModal");
   if (!$("#cmGameModal").hidden) closeModal("cmGameModal");
   if (!$("#quizModal").hidden && !GB_ROOMS.includes(room)) closeModal("quizModal");
@@ -931,6 +939,7 @@ function joinRoom(room, from) {
   if (GB_ROOMS.includes(room)) { loadGuestbook(room); loadQuizMeta(); }
   if (NOTICE_ROOMS[room]) loadNotices(room);
   if (room === "yard") { loadFood(); loadCatFeeds(); loadCookie(); }
+  if (room === "showroom") { loadCookie(); renderShowPanel(); }
   // 4초 넘게 머물면 "다녀갔어요" 발자취를 남겨요
   clearTimeout(visitTimer);
   visitTimer = setTimeout(() => { if (S.room === room) { leaveFootprint("visit"); maybeNotifyVisit(room); } }, 4000);
@@ -945,6 +954,7 @@ function rejoinSameRoom() { if (started) api.joinRoom(S.room, meState(), roomHan
 
 /* ================= 마당 / 비전 / 301호 입력 (상태 메시지) ================= */
 function bindStatus(inputSel, postSel, clearSel) {
+  if (!$(inputSel)) return;
   const post = () => {
     const v = $(inputSel).value.trim();
     if (!v) { toast("상태 메시지를 적어주세요"); return; }
@@ -961,6 +971,7 @@ bindStatus("#yardInput", "#yardPost", "#yardClear");
 bindStatus("#visionInput", "#visionPost", "#visionClear");
 bindStatus("#r301Input", "#r301Post", "#r301Clear");
 bindStatus("#praiseInput", "#praisePost", "#praiseClear");
+bindStatus("#showInput", "#showPost", "#showClear");
 // 소파 눕기 (비전 검은 소파, 301호 갈색 소파)
 function updateLieBtn() {
   const can = W.canLie(S.seat);
@@ -1748,6 +1759,7 @@ function onSport(m) {
   else if (m.k === "serve") onServe(m);
   else if (m.k === "rally") onRally(m);
   else if (m.k === "bbgame") onGame(m);
+  else if (m.k === "skstart") onSkStart(m);
 }
 // ---- 아래 운동장 막대 ----
 function renderSportBar(force) {
@@ -2386,7 +2398,7 @@ $("#qzReset").onclick = async () => {
 const FPS = { list: [], ok: true, warned: false };
 const fpLocal = (() => { const o = store.get("fpLocal", {}), now = Date.now(); for (const k in o) if (now - o[k].t > 86400e3) delete o[k]; return o; })();
 async function leaveFootprint(kind, extra = {}) {
-  if (!started) return;
+  if (!started || S.room === "showroom") return; // 쇼룸은 발자취 방 목록에 없어요 (출석 미션은 따로 기록)
   const p = S.profile || {};
   const f = {
     room: S.room, kind, name: kind === "pray" && S.anon ? "" : clip(p.name, LIMIT.name), color: p.color,
@@ -2595,7 +2607,7 @@ document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   closeDrawers();
   $("#peoplePop").hidden = true;
-  ["reportModal", "planModal", "adminModal", "readerModal", "gbModal", "installModal", "truckModal", "shelfModal", "cookModal", "catModal", "quizModal", "songModal", "schedModal", "thanksModal", "challengeModal", "sportRankModal", "notifyModal", "jamPickModal", "cdModal", "recModal", "mapModal", "songsModal", "sheetModal", "songEditModal", "albumModal", "showModal", "cmGameModal", "orderModal", "adModal"].forEach(closeModal);
+  ["reportModal", "planModal", "adminModal", "readerModal", "gbModal", "installModal", "truckModal", "shelfModal", "cookModal", "catModal", "quizModal", "songModal", "schedModal", "thanksModal", "challengeModal", "sportRankModal", "notifyModal", "jamPickModal", "cdModal", "recModal", "mapModal", "songsModal", "sheetModal", "songEditModal", "albumModal", "showModal", "cmGameModal", "orderModal", "adModal", "giftModal", "welcomeModal"].forEach(closeModal);
 });
 
 /* ================= 관리자 ================= */
@@ -2710,7 +2722,7 @@ const Sound = {
     m.gain.linearRampToValueAtTime(room === "worship" ? 0.22 : room === "room301" ? 0.18 : 0.32, ctx.currentTime + 2.5);
     m.connect(ctx.destination); this.master = m;
     if (room === "praise") return; // 연습실은 배경음 없이 (악기 소리·CD가 잘 들리게)
-    if (room === "worship" || room === "room301") this.piano(); else if (room === "cafe" || room === "vision") this.jazz(); else this.outdoor(1);
+    if (room === "worship" || room === "room301") this.piano(); else if (room === "cafe" || room === "vision" || room === "showroom") this.jazz(); else this.outdoor(1);
   },
   song() {}, // 예전 마당 음원 자리 (지금은 아무것도 안 해요)
   piano() {
@@ -2877,7 +2889,7 @@ function setSound(on, quiet) {
   Sound.on = on; store.set("soundOff", !on);
   const b = $("#soundBtn"); b.classList.toggle("on", Sound.on); b.firstChild.textContent = Sound.on ? "🔊" : "🔈";
   Sound.on ? Sound.start(S.room) : Sound.stop();
-  const msg = { yard: "바람 소리와 새소리를 틀었어요", worship: "잔잔한 피아노를 틀었어요", cafe: "찬송가 재즈를 틀었어요 🎷", vision: "찬송가 재즈를 틀었어요 🎷", room301: "작은 소리로 피아노를 틀었어요 😌", praise: "연습실은 배경음 없이 조용해요 · 악기를 쳐 보세요 🎸" };
+  const msg = { yard: "바람 소리와 새소리를 틀었어요", worship: "잔잔한 피아노를 틀었어요", cafe: "찬송가 재즈를 틀었어요 🎷", vision: "찬송가 재즈를 틀었어요 🎷", room301: "작은 소리로 피아노를 틀었어요 😌", showroom: "쇼룸에 재즈를 틀었어요 🧀🎷", praise: "연습실은 배경음 없이 조용해요 · 악기를 쳐 보세요 🎸" };
   if (!quiet) toast(Sound.on ? msg[S.room] : "배경음을 껐어요");
 }
 $("#soundBtn").onclick = () => setSound(!Sound.on);
@@ -2900,11 +2912,11 @@ $("#songPlay").onclick = () => {
 
 /* ================= 입장 / 캐릭터 꾸미기 ================= */
 const draft = Object.assign({ name: "", color: L.shirts[Math.floor(Math.random() * L.shirts.length)], hair: "short", hairColor: "#2b2220", glasses: "none", gender: "m", item: "none", wear: "none",
-  halo: "none", trail: "none", shoulder: "none", apron: "none", pin: "none", badge: "", pet: -1, petPick: 0 }, S.profile || {});
+  halo: "none", trail: "none", shoulder: "none", apron: "none", pin: "none", badge: "", title: "", pet: -1, petPick: 0 }, S.profile || {});
 let preview = null;
 function renderPickers() {
   // 🔒 미션으로 받는 것은 받기 전까지 잠겨 있어요 (누르면 받는 방법을 알려 줘요)
-  const slotOf = { item: "item", wear: "wear", halo: "halo", trail: "trail", shoulder: "shoulder", apron: "apron", pin: "pin", badge: "badge" };
+  const slotOf = { item: "item", wear: "wear", halo: "halo", trail: "trail", shoulder: "shoulder", apron: "apron", pin: "pin", badge: "badge", title: "title" };
   const chips = (box, list, key) => $(box).replaceChildren(...list.map(([v, label]) => {
     const sk = slotOf[key] && skinFor(slotOf[key], v), lock = !!sk && !skinOpen(sk, skinCtx());
     return h("button", { class: "chip-btn" + (draft[key] === v ? " sel" : "") + (lock ? " locked" : ""), text: (lock ? "🔒 " : "") + label, onclick: () => {
@@ -2921,6 +2933,7 @@ function renderPickers() {
   chips("#pinPick", L.pins, "pin");
   chips("#trailPick", L.trails, "trail");
   chips("#badgePick", [["", "없음"], ["newyear", "🎉 새해"], ["easter", "✝️ He is risen"], ["reform", "📖 5 SOLA"]], "badge");
+  chips("#titlePick", [["", "없음"], ["branch", "🌿 가지"], ["fruit", "🍇 열매 맺는"], ["tree", "🌳 큰 나무 (금빛 이름표)"]], "title");
   const petOk = skinOpen(skinFor("pet", "cat"), skinCtx());
   $("#petPick").replaceChildren(...[[-1, "없음"], ...W.CATS.map((c, i) => [i, `🐱 ${c.name}`])].map(([v, label]) => h("button", { class: "chip-btn" + (draft.pet === v ? " sel" : "") + (!petOk && v >= 0 ? " locked" : ""), text: (!petOk && v >= 0 ? "🔒 " : "") + label,
     onclick: () => { if (!petOk && v >= 0) { toast("🔒 따라다니는 고양이: 고양이 밥 20번 주면 받아요"); return; } draft.pet = v; if (v >= 0) draft.petPick = v; renderPickers(); } })));
@@ -2928,7 +2941,7 @@ function renderPickers() {
   swatch("#hairColorPick", L.hairColors.map((x) => x[0]), "hairColor");
   chips("#glassesPick", L.glasses, "glasses");
   swatch("#colorPick", L.shirts, "color");
-  if (preview) preview.set(draft);
+  if (preview) preview.set({ ...draft, costume: giftActive() || "" });
 }
 function renderMeChip() {
   const p = S.profile || {};
@@ -2950,11 +2963,11 @@ $("#enterBtn").onclick = () => {
   if (name && !checkText(name)) return;
   draft.name = clip(name, LIMIT.name);
   S.profile = { name: draft.name, color: draft.color, hair: draft.hair, hairColor: draft.hairColor, glasses: draft.glasses, gender: draft.gender, item: draft.item, wear: draft.wear,
-    halo: draft.halo, trail: draft.trail, shoulder: draft.shoulder, apron: draft.apron, pin: draft.pin, badge: draft.badge || "", pet: Number.isInteger(draft.pet) ? draft.pet : -1, petPick: draft.petPick || 0 };
+    halo: draft.halo, trail: draft.trail, shoulder: draft.shoulder, apron: draft.apron, pin: draft.pin, badge: draft.badge || "", title: draft.title || "", pet: Number.isInteger(draft.pet) ? draft.pet : -1, petPick: draft.petPick || 0 };
   store.set("profile", S.profile);
   closeModal("entryModal"); preview && preview.stop();
   renderMeChip();
-  if (!started) { started = true; joinRoom("yard", "def"); loadMissions(); } else refreshMe();
+  if (!started) { started = true; joinRoom("yard", "def"); loadMissions().then(() => setTimeout(maybeWelcome, 1200)); } else refreshMe();
 };
 $("#nameInput").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) $("#enterBtn").click(); });
 $("#meChip").onclick = () => openEntry(false);
@@ -3502,7 +3515,8 @@ function renderCdShare() {
 const MS = { log: store.get("mlog", {}), books: {}, resolve: store.get("mresolve", ""), loaded: false, noServer: false, seen: new Set(store.get("mSeen", [])) };
 const dIdx = (d) => Math.floor(Date.parse(d + "T12:00:00Z") / 864e5); // 날짜 → 날 번호 (오늘의 말씀 계산과 같아요)
 const dStr = (i) => new Date(i * 864e5).toISOString().slice(0, 10);   // 날 번호 → 날짜
-const MCAP = (k) => (/^(visit|stamp|resolve|jam)$/.test(k) || /^(read|season):/.test(k) ? 1 : k === "pray" ? 20 : 30);
+const MCAP = (k) => (/^(visit|stamp|resolve|jam)$/.test(k) || /^(read|season|gift):/.test(k) ? 1 : k === "pray" ? 20 : 30);
+MS.giftAt = store.get("giftAt", {}); // { "날짜|선물id": 받은 시각(ms) } → 24시간 동안 입어요
 function saveMlog() {
   const cut = dIdx(nyDay()) - 800;
   for (const d of Object.keys(MS.log)) if (dIdx(d) < cut) delete MS.log[d];
@@ -3515,6 +3529,7 @@ function mAdd(kind, note) {
   if (cur >= MCAP(kind)) return false;
   day[kind] = cur + 1; saveMlog();
   if (kind === "resolve" && note) { MS.resolve = clip(note, 80); store.set("mresolve", MS.resolve); }
+  if (kind.startsWith("gift:")) { MS.giftAt[d + "|" + kind.slice(5)] = Date.now(); store.set("giftAt", MS.giftAt); }
   if (!api.demo && !MS.noServer) api.missionAdd(kind, note).catch((e) => { if (/준비 중/.test(e.message)) { MS.noServer = true; console.warn("미션 기록: Supabase에서 supabase-update-missions.sql을 실행해 주세요"); } else console.warn("미션 기록:", e.message); });
   if (!/^(stamp|season:)/.test(kind)) setTimeout(() => missionCheck(kind), 30);
   return true;
@@ -3524,7 +3539,11 @@ function mPray() { const t = store.get("mPrayAt", 0); if (Date.now() - t < 10 * 
 async function loadMissions() {
   try {
     const r = await api.missionMe(); MS.loaded = true;
-    for (const [d, k, n] of r.log || []) { const day = MS.log[d] || (MS.log[d] = {}); day[k] = Math.max(day[k] || 0, n); }
+    for (const [d, k, n, at] of r.log || []) {
+      const day = MS.log[d] || (MS.log[d] = {}); day[k] = Math.max(day[k] || 0, n);
+      if (k.startsWith("gift:") && at && !MS.giftAt[d + "|" + k.slice(5)]) MS.giftAt[d + "|" + k.slice(5)] = Number(at) * 1000;
+    }
+    store.set("giftAt", MS.giftAt);
     MS.books = {}; for (const [b, n, at] of r.books || []) MS.books[b] = { n: Number(n), at: at ? new Date(at).getTime() : 0 };
     if (r.resolve) MS.resolve = r.resolve;
     saveMlog();
@@ -3581,7 +3600,7 @@ function streaks() {
 function mTotals() {
   const t = { pray: 0, give: 0, catfeed: 0, quiz: 0, jam: 0, cookie: 0, stamp: 0, visit: 0, lastCat: null }, chaps = new Set(), byYear = {};
   for (const [d, day] of Object.entries(MS.log)) {
-    const y = d.slice(0, 4), Y = byYear[y] || (byYear[y] = { visit: 0, pray: 0, read: 0, stamp: 0, cookie: 0, catfeed: 0 });
+    const y = d.slice(0, 4), Y = byYear[y] || (byYear[y] = { visit: 0, pray: 0, read: 0, stamp: 0, cookie: 0, catfeed: 0, quiz: 0, give: 0, jam: 0 });
     for (const [k, n] of Object.entries(day)) {
       if (k.startsWith("read:")) { chaps.add(k); Y.read++; continue; }
       if (k in t) t[k] += n; if (k in Y) Y[k] += n;
@@ -3661,6 +3680,12 @@ const SKINS = [
   { slot: "pet", v: "cat", e: "🐱", name: "따라다니는 고양이", need: "고양이 밥 20번 · 일주일에 한 번은 밥을 줘야 계속 따라와요", prog: (c) => [c.t.catfeed, 20] },
   { slot: "item", v: "scroll", e: "📜", name: "두루마리 성경", need: "성경 한 권 다 읽기 (이름표에 최근 다 읽은 책)", prog: (c) => [c.books.length, 1] },
   { slot: "apron", v: "cheese", e: "🧀", name: "치즈 앞치마", need: "쇼룸에서 쫀득쿠키 10박스 만들기", prog: (c) => [c.t.cookie, 10] },
+  // ✅ 미션 도장 모으기 (그루터기에서 자라나요 · 사 6:13, 요 15:5)
+  { slot: "title", v: "branch", e: "🌿", name: "'가지' 칭호", need: "미션 도장 3개", prog: (c) => [c.t.stamp, 3], stamp: 3 },
+  { slot: "halo", v: "rainbow", e: "🌈", name: "언약의 무지개 (창 9:13)", need: "미션 도장 7개", prog: (c) => [c.t.stamp, 7], stamp: 7 },
+  { slot: "item", v: "grapes", e: "🍇", name: "포도송이 들기", need: "미션 도장 15개", prog: (c) => [c.t.stamp, 15], stamp: 15 },
+  { slot: "title", v: "fruit", e: "🍇", name: "'열매 맺는' 칭호", need: "미션 도장 15개", prog: (c) => [c.t.stamp, 15], stamp: 15 },
+  { slot: "title", v: "tree", e: "🌳", name: "'큰 나무' 칭호 + 금빛 이름표", need: "미션 도장 30개", prog: (c) => [c.t.stamp, 30], stamp: 30 },
   { slot: "item", v: "basket", e: "🌾", name: "곡식 바구니", season: "thanks" },
   { slot: "halo", v: "star", e: "⭐", name: "베들레헴 별", season: "xmas" },
   { slot: "badge", v: "newyear", e: "🎉", name: "새해 배지", season: "newyear" },
@@ -3670,6 +3695,7 @@ const SKINS = [
   { slot: "wear", v: "wheathat", e: "🌿", name: "밀 이삭 모자", season: "barley" },
   { slot: "badge", v: "reform", e: "📖", name: "5 SOLA 배지", season: "reform" },
 ];
+const TITLE_TXT = { branch: "🌿 가지", fruit: "🍇 열매 맺는", tree: "🌳 큰 나무" };
 const BADGE_TXT = { newyear: (y) => `🎉 ${y} 새해`, easter: () => "✝️ He is risen", reform: () => "📖 5 SOLA" };
 let mCtx = null;
 function skinCtx() { return (mCtx = { st: streaks(), t: mTotals(), books: booksDone(), won: seasonWon() }); }
@@ -3687,7 +3713,8 @@ function mySkins() {
   const out = { halo: ok("halo", p.halo) ? p.halo : "none", trail: ok("trail", p.trail) ? p.trail : "none", shoulder: ok("shoulder", p.shoulder) ? p.shoulder : "none",
     apron: ok("apron", p.apron) ? p.apron : "none", pin: ok("pin", p.pin) ? p.pin : "none",
     pet: Number.isInteger(p.pet) && p.pet >= 0 && skinOpen(skinFor("pet", "cat"), c) && petActive(c) ? p.pet : -1,
-    item: lockedLook("item", p.item) ? "none" : p.item, wear: lockedLook("wear", p.wear) ? "none" : p.wear, badge: "", book: "" };
+    item: lockedLook("item", p.item) ? "none" : p.item, wear: lockedLook("wear", p.wear) ? "none" : p.wear, badge: "", book: "", title: "", costume: giftActive() || "" };
+  if (p.title && skinFor("title", p.title) && skinOpen(skinFor("title", p.title), c)) out.title = p.title;
   if (p.badge && skinFor("badge", p.badge) && skinOpen(skinFor("badge", p.badge), c)) { const ys = c.won[p.badge] || []; out.badge = BADGE_TXT[p.badge](ys[ys.length - 1]); }
   if (out.item === "scroll" && c.books.length) out.book = "📜 " + c.books[0].name;
   return out;
@@ -3697,7 +3724,7 @@ function mySkins() {
 function missionCheck(kind) {
   const d = nyDay(), list = todayMissions(), day = MS.log[d] || {};
   if (kind) { const m = list.find((x) => x.done && (x.m === kind || (x.m === "share" && kind === "give") || (x.m === "verse" && /^read:/.test(kind)))); if (m && !store.get("mT" + d + m.m, false)) { store.set("mT" + d + m.m, true); toast(`${m.e} 오늘의 미션 완료: ${m.t} ✓`); } }
-  if (list.every((x) => x.done) && !day.stamp) { mAdd("stamp"); setTimeout(() => { toast("🎉 오늘의 미션 3개 다 했어요! 도장 쾅 ✅"); confetti(); }, 900); }
+  if (list.every((x) => x.done) && !day.stamp) { mAdd("stamp"); setTimeout(() => { toast("🎉 오늘의 미션 3개 다 했어요! 도장 쾅 ✅ 선물 상자가 열렸어요 🎁"); confetti(); openGift(); }, 900); }
   const sn = seasonNow();
   if (sn && sn.tasks.every(([k]) => seasonTaskDone(k, sn.a, sn.b)) && !(seasonWon()[sn.id] || []).includes(sn.y)) {
     mAdd(`season:${sn.id}:${sn.y}`);
@@ -3738,6 +3765,88 @@ function goYard(x, z, label, then) {
   if (S.room !== "yard") { joinRoom("yard", S.room); setTimeout(go, 700); } else go();
 }
 
+// ---- 🎁 오늘의 선물: 미션 3개를 다 하면 상자를 열어요 → 하루짜리 꾸미기(약 75%) 또는 ✨ 희귀 성경 인물 착장(약 25%) · 24시간 ----
+const GIFT_RARE = 25;
+const tokHash = (() => { let x = 0; for (const ch of token) x = (Math.imul(x, 31) + ch.charCodeAt(0)) | 0; return x >>> 0; })();
+const COST = () => W.COSTUMES || {};
+function giftCollected() { const out = new Map(); for (const [d, day] of Object.entries(MS.log)) for (const k of Object.keys(day)) if (k.startsWith("gift:") && COST()[k.slice(5)]) { const id = k.slice(5); if (!out.has(id) || out.get(id) > d) out.set(id, d); } return out; } // id → 처음 받은 날
+function giftOf(d) { const day = MS.log[d] || {}; const k = Object.keys(day).find((x) => x.startsWith("gift:")); return k ? k.slice(5) : null; }
+// 하루 한 번, 새로고침해도 같은 결과 (기기 표시 + 날짜로 정해요). 희귀는 아직 못 받은 인물부터
+function giftPick(d) {
+  const all = Object.entries(COST()), mo = +d.slice(5, 7), hsh = hash2(dIdx(d), tokHash), rare = hsh % 100 < GIFT_RARE;
+  let pool = all.filter(([, c]) => !!c.rare === rare && (!c.month || c.month === mo));
+  if (rare) { const have = giftCollected(); const fresh = pool.filter(([id]) => !have.has(id)); if (fresh.length) pool = fresh; }
+  return pool.length ? pool[(hsh >>> 8) % pool.length][0] : null;
+}
+// 지금 입고 있는 선물 (받은 때부터 24시간, '벗기'를 누르면 그날은 안 입어요)
+function giftActive() {
+  const now = Date.now(), off = store.get("giftOff", {});
+  for (const [key, at] of Object.entries(MS.giftAt || {})) {
+    const [d, id] = key.split("|");
+    if (now - at < 24 * 3600e3 && now >= at && COST()[id] && !off[key]) return id;
+  }
+  return null;
+}
+function giftKeyActive() { const now = Date.now(); for (const [key, at] of Object.entries(MS.giftAt || {})) if (now - at < 24 * 3600e3) return key; return null; }
+function giftLeftText(key) { const ms = 24 * 3600e3 - (Date.now() - (MS.giftAt[key] || 0)); const hh = Math.max(0, Math.floor(ms / 3600e3)), mm = Math.max(0, Math.floor((ms % 3600e3) / 60e3)); return `${hh}시간 ${mm}분 남았어요`; }
+function giftCard(id, opts = {}) {
+  const c = COST()[id]; if (!c) return null;
+  return h("div", { class: "gift-card" + (c.rare ? " rare" : "") },
+    h("div", { class: "gc-tag", text: c.rare ? "✨ 희귀 · 성경 인물 착장" : "🎀 하루짜리 꾸미기" }),
+    h("div", { class: "gc-em", text: c.e }), h("b", { text: c.name }),
+    c.ref ? h("p", { class: "gc-ref", text: `${c.who} · ${c.ref[2]}` }) : null,
+    c.ref ? h("button", { class: "btn ghost sm", text: "📖 이 이야기 읽기", onclick: () => { closeModal("giftModal"); closeModal("albumModal"); openReader(c.ref[0] - 1, c.ref[1]); } }) : null,
+    opts.left ? h("small", { class: "muted", text: "⏳ " + opts.left }) : null);
+}
+function openGift() {
+  const d = nyDay(), day = MS.log[d] || {}, had = giftOf(d);
+  const body = $("#giftBody");
+  if (!day.stamp) { body.replaceChildren(h("p", { class: "muted", text: "오늘의 미션 3개를 다 하면 선물 상자를 열 수 있어요 🎁" })); openModal("giftModal"); return; }
+  if (had) { const key = d + "|" + had; body.replaceChildren(h("p", { class: "muted", text: "오늘 받은 선물이에요. 받은 때부터 24시간 동안 입어요." }), giftCard(had, { left: giftLeftText(key) }), giftWearBtn(key)); openModal("giftModal"); return; }
+  const boxEl = h("button", { class: "gift-box", title: "눌러서 열기", onclick: () => {
+    boxEl.classList.add("open"); setTimeout(() => {
+      const id = giftPick(d); if (!id) return;
+      mAdd(`gift:${id}`); const c = COST()[id];
+      body.replaceChildren(h("p", { class: "gift-wow", text: c.rare ? "✨ 와! 희귀 착장이에요!" : "🎉 선물이 나왔어요!" }), giftCard(id, { left: "지금부터 24시간 동안 입어요" }),
+        c.rare && !giftCollected().has(id) ? null : h("p", { class: "muted tiny", text: c.rare ? "📖 성경 인물 도감에 추가됐어요 (🌱 내 그루터기 → 🎁 선물·도감)" : "다른 사람 화면에도 보여요 😊" }));
+      confetti(); refreshMe(); renderMissionBits();
+    }, 650);
+  } }, h("span", { text: "🎁" }));
+  body.replaceChildren(h("p", { class: "muted", text: "오늘의 미션을 다 했어요! 상자를 눌러서 열어 보세요." }), boxEl, h("p", { class: "muted tiny", text: "하루짜리 꾸미기나, 가끔 ✨ 희귀 성경 인물 착장이 나와요." }));
+  openModal("giftModal");
+}
+function giftWearBtn(key) {
+  const off = store.get("giftOff", {});
+  return h("button", { class: "btn ghost sm", text: off[key] ? "👕 다시 입기" : "🙅 오늘은 벗기", onclick: () => { const o = store.get("giftOff", {}); o[key] = !o[key]; store.set("giftOff", o); refreshMe(); renderAlbum(); if (!$("#giftModal").hidden) openGift(); } });
+}
+function giftStatusEl() {
+  const d = nyDay(), day = MS.log[d] || {}, key = giftKeyActive();
+  if (day.stamp && !giftOf(d)) return h("button", { class: "btn primary wide gift-open", text: "🎁 오늘의 선물 상자 열기", onclick: openGift });
+  if (key) return h("div", { class: "gift-now" }, h("span", { text: "🎁 지금 입고 있는 선물: " }), h("b", { text: COST()[key.split("|")[1]]?.name || "" }), h("small", { text: " · " + giftLeftText(key) }));
+  return null;
+}
+function stampNextEl(c) {
+  const next = SKINS.filter((k) => k.stamp && c.t.stamp < k.stamp).sort((a, b) => a.stamp - b.stamp)[0];
+  if (!next) return h("p", { class: "muted tiny", text: "✅ 도장 보상을 모두 받았어요! 🌳" });
+  const left = next.stamp - c.t.stamp;
+  return h("div", { class: "stamp-next" }, h("span", { text: `✅ 도장 ${left}개만 더 모으면 ${next.e} ${next.name}` }), h("div", { class: "al-bar" }, h("i", { style: `width:${Math.min(100, (c.t.stamp / next.stamp) * 100)}%` })));
+}
+// 🎁 선물·도감 탭
+function albumGift(c) {
+  const have = giftCollected(), rare = Object.entries(COST()).filter(([, x]) => x.rare), common = Object.entries(COST()).filter(([, x]) => !x.rare);
+  const key = giftKeyActive();
+  const out = [giftStatusEl() || h("p", { class: "muted tiny", text: "오늘의 미션 3개를 다 하면 선물 상자가 열려요. 받은 선물은 24시간 동안 입어요." })];
+  if (key) out.push(giftCard(key.split("|")[1], { left: giftLeftText(key) }), giftWearBtn(key));
+  out.push(h("div", { class: "board-label", text: `📖 성경 인물 도감 ${rare.filter(([id]) => have.has(id)).length}/${rare.length}` }),
+    h("div", { class: "dex" }, ...rare.map(([id, x]) => { const got = have.has(id);
+      return h("button", { class: "dex-item" + (got ? " got" : ""), title: got ? `${x.name} · ${x.ref[2]}` : "아직 못 만났어요", onclick: () => { if (got) { closeModal("albumModal"); openReader(x.ref[0] - 1, x.ref[1]); } else toast(`❔ 아직 못 만난 인물이에요. 힌트: ${x.ref[2]}${x.month ? " (12월에만 나와요)" : ""}`); } },
+        h("span", { class: "em", text: got ? x.e : "❔" }), h("b", { text: got ? x.who : "???" }), h("small", { text: got ? x.ref[2] : x.month ? "12월 한정" : "" })); })),
+    h("p", { class: "muted tiny", text: "받은 인물을 누르면 그 이야기를 읽을 수 있어요. 희귀 착장은 아직 못 만난 인물부터 나와요." }),
+    h("div", { class: "board-label", text: "🎀 하루짜리 꾸미기" }),
+    h("div", { class: "chips" }, ...common.map(([id, x]) => h("span", { class: "chip" + (have.has(id) ? "" : " dim"), text: `${have.has(id) ? x.e : "❔"} ${x.name}` }))));
+  return out;
+}
+
 // ---- 🌱 내 그루터기 (신앙 앨범) ----
 let albumTab = "mission";
 function openAlbum(tab) { if (tab) albumTab = tab; skinCtx(); renderAlbum(); openModal("albumModal"); if (!MS.loaded) loadMissions(); }
@@ -3745,7 +3854,7 @@ $$("[data-atab]").forEach((b) => (b.onclick = () => { albumTab = b.dataset.atab;
 function renderAlbum() {
   $$("[data-atab]").forEach((b) => b.classList.toggle("active", b.dataset.atab === albumTab));
   const c = skinCtx(), body = $("#albumBody");
-  body.replaceChildren(...({ mission: albumMission, skins: albumSkins, record: albumRecord, card: albumCard }[albumTab] || albumMission)(c));
+  body.replaceChildren(...({ mission: albumMission, gift: albumGift, skins: albumSkins, record: albumRecord, card: albumCard }[albumTab] || albumMission)(c));
 }
 function albumMission(c) {
   const list = todayMissions(), done = list.filter((x) => x.done).length, sn = seasonNow(), nx = seasonNext();
@@ -3758,8 +3867,10 @@ function albumMission(c) {
     h("div", { class: "board-label", text: `🎯 오늘의 미션 ${done}/3 ${done === 3 ? "· 도장 쾅! 🎉" : ""}` }),
     h("ul", { class: "al-list" }, ...list.map((x) => h("li", { class: x.done ? "done" : "" }, h("span", { class: "mc-chk", text: x.done ? "✓" : x.e }),
       h("span", { class: "t" }, x.t, h("small", { text: x.how })), x.done ? h("b", { class: "ok", text: "완료" }) : h("button", { class: "btn ghost sm", text: "가기", onclick: () => x.go() })))),
-    h("p", { class: "muted tiny", text: "미션은 뉴욕 시간 자정에 바뀌고, 모두에게 같은 미션이 나와요." }),
-  ];
+    h("p", { class: "muted tiny", text: "미션은 뉴욕 시간 자정에 바뀌고, 모두에게 같은 미션이 나와요. 3개를 다 하면 🎁 선물 상자가 열려요." }),
+    giftStatusEl(),
+    stampNextEl(c),
+  ].filter(Boolean);
   if (sn) {
     out.push(h("div", { class: "board-label", text: `${sn.e} ${sn.name} 한정 미션 (${dStr(sn.a).slice(5).replace("-", "/")} ~ ${dStr(sn.b).slice(5).replace("-", "/")})` }));
     out.push(h("ul", { class: "al-list season" }, ...sn.tasks.map(([k, t, go]) => { const ok = seasonTaskDone(k, sn.a, sn.b);
@@ -3778,7 +3889,7 @@ function albumSkins(c) {
   const toggle = (sk) => {
     const prof = { ...p }, on = !wearing(sk);
     if (sk.slot === "pet") prof.pet = on ? (Number.isInteger(prof.petPick) ? prof.petPick : 0) : -1;
-    else prof[sk.slot] = on ? sk.v : sk.slot === "badge" ? "" : "none";
+    else prof[sk.slot] = on ? sk.v : sk.slot === "badge" || sk.slot === "title" ? "" : "none";
     S.profile = prof; store.set("profile", prof); Object.assign(draft, prof); refreshMe(); renderMeChip(); renderAlbum();
     toast(on ? `${sk.e} ${sk.name} 착용!` : `${sk.e} ${sk.name}을(를) 벗었어요`);
   };
@@ -3820,34 +3931,124 @@ function albumRecord(c) {
     h("p", { class: "muted tiny", text: api.demo ? "데모 모드: 이 기기에만 저장돼요." : MS.noServer ? "⚠ 아직 서버 저장 준비 전이라 이 기기에만 저장돼요 (관리자: supabase-update-missions.sql)." : "기록은 서버에도 저장돼요. 같은 기기·같은 브라우저로 들어오면 이어져요." }),
   ];
 }
-// ---- 🗓 올해 카드 (공유용 그림) ----
+// ---- 📸 나의 그루터기 카드 (공유용 그림): 내 캐릭터 + 다녀간 날·말씀·기도·활동 그래프 + 가진 아이템 ----
 function albumCard(c) {
-  const y = nyDay().slice(0, 4), Y = c.t.byYear[y] || { visit: 0, pray: 0, read: 0, stamp: 0, cookie: 0, catfeed: 0 };
-  const cv = document.createElement("canvas"); cv.width = 1080; cv.height = 1350; const g = cv.getContext("2d");
-  const grd = g.createLinearGradient(0, 0, 0, 1350); grd.addColorStop(0, "#fdf6e3"); grd.addColorStop(1, "#e6f1df"); g.fillStyle = grd; g.fillRect(0, 0, 1080, 1350);
-  g.fillStyle = "#2f4a3a"; g.textAlign = "center";
-  g.font = "700 46px 'Gowun Batang', serif"; g.fillText("퀸장그루터기", 540, 120);
-  g.font = "700 84px 'Gowun Batang', serif"; g.fillText(`${y} 나의 그루터기`, 540, 230);
-  g.font = "44px 'Gowun Dodum', sans-serif"; g.fillStyle = "#5a6b5f"; g.fillText((S.profile?.name || "익명") + "님의 한 해", 540, 300);
-  const items = [["🌱", Y.visit, "다녀간 날"], ["📖", Y.read, "읽은 장"], ["🙏", Y.pray, "기도"], ["✅", Y.stamp, "미션 도장"], ["🐾", Y.catfeed, "고양이 밥"], ["🧀", Y.cookie, "쫀득쿠키 박스"]];
-  items.forEach(([e, n, l], i) => {
-    const x = 270 + (i % 2) * 540, yy = 430 + Math.floor(i / 2) * 230;
-    g.fillStyle = "#ffffff"; g.beginPath(); g.roundRect ? g.roundRect(x - 230, yy - 90, 460, 190, 36) : g.rect(x - 230, yy - 90, 460, 190); g.fill();
-    g.fillStyle = "#2f4a3a"; g.font = "700 76px 'Gowun Dodum', sans-serif"; g.fillText(`${e} ${Number(n).toLocaleString()}`, x, yy + 10);
-    g.font = "38px 'Gowun Dodum', sans-serif"; g.fillStyle = "#6b7a70"; g.fillText(l, x, yy + 70);
-  });
-  g.fillStyle = "#2f4a3a"; g.font = "700 40px 'Gowun Dodum', sans-serif";
-  g.fillText(`🔥 최고 연속 출석 ${c.st.best}일 · 📚 다 읽은 책 ${c.books.length}권`, 540, 1150);
-  g.font = "34px 'Gowun Batang', serif"; g.fillStyle = "#5a6b5f"; g.fillText("거룩한 씨가 이 땅의 그루터기니라", 540, 1235); g.font = "28px 'Gowun Batang', serif"; g.fillText("이사야 6:13", 540, 1285);
-  const url = cv.toDataURL("image/png");
-  const share = async () => {
-    try { const blob = await (await fetch(url)).blob(), file = new File([blob], `그루터기-${y}.png`, { type: "image/png" });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: `${y} 나의 그루터기` }); else toast("이 브라우저는 바로 공유가 안 돼요. 저장한 뒤 카톡으로 보내 주세요");
-    } catch (e) { if (e.name !== "AbortError") toast("공유하지 못했어요"); }
-  };
-  return [h("p", { class: "muted tiny", text: `${y}년 기록으로 만든 카드예요. 연말에 저장해서 친구들과 나눠요.` }), h("img", { class: "al-card", src: url, alt: `${y} 나의 그루터기 카드` }),
-    h("div", { class: "modal-actions" }, h("a", { class: "btn primary", href: url, download: `그루터기-${y}.png`, text: "💾 그림으로 저장" }), h("button", { class: "btn ghost", text: "📤 공유하기", onclick: share }))];
+  const y = nyDay().slice(0, 4), Y = c.t.byYear[y] || {};
+  const v = (k) => Number(Y[k] || 0);
+  const act = v("quiz") + v("catfeed") + v("give") + v("jam");
+  const rows = [["🌱", "다녀간 날", v("visit"), 100, "#7cc24a"], ["📖", "읽은 말씀 (장)", v("read"), 300, "#3a8fd9"], ["🙏", "기도", v("pray"), 100, "#e8862f"], ["🎯", "활동 (퀴즈·고양이 밥·나눔·연주)", act, 100, "#d9483b"], ["✅", "미션 도장", v("stamp"), 50, "#8e44ad"]];
+  // 가진 아이템: 받은 스킨 + 만난 성경 인물
+  const owned = SKINS.filter((k) => skinOpen(k, c)).map((k) => k.e + " " + k.name.replace(/\s*\(.*\)$/, ""));
+  const dex = [...giftCollected().keys()].map((id) => COST()[id]).filter((x) => x && x.rare).map((x) => x.e + " " + x.who);
+  const items = [...owned, ...dex];
+  const holder = h("div", { class: "al-card-wrap" }, h("p", { class: "muted", text: "카드를 만드는 중이에요… 🎨" }));
+  const look = { ...(S.profile || {}), ...mySkins() }, pal = look.costume === "daniel" || (Number.isInteger(look.pet) && look.pet >= 0);
+  setTimeout(async () => {
+    let charImg = null;
+    try { const url = W.snapshot(look, pal ? 900 : 740, 900); charImg = await new Promise((ok) => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => ok(null); im.src = url; }); } catch (e) { console.warn("캐릭터 사진:", e); }
+    const cv = document.createElement("canvas"); cv.width = 1080; cv.height = 1350; const g = cv.getContext("2d");
+    // 게임 캐릭터 화면처럼: 흰 바탕 없이 밤하늘·숲 그라데이션 + 캐릭터 뒤 스포트라이트
+    const grd = g.createLinearGradient(0, 0, 0, 1350); grd.addColorStop(0, "#1d2f52"); grd.addColorStop(0.55, "#2b4d58"); grd.addColorStop(1, "#24452f"); g.fillStyle = grd; g.fillRect(0, 0, 1080, 1350);
+    const spot = g.createRadialGradient(380, 560, 40, 380, 560, 520); spot.addColorStop(0, "rgba(255,236,170,.55)"); spot.addColorStop(0.5, "rgba(255,220,140,.16)"); spot.addColorStop(1, "rgba(255,220,140,0)"); g.fillStyle = spot; g.fillRect(0, 0, 1080, 1350);
+    let sd = 7; const rnd = () => ((sd = (sd * 9301 + 49297) % 233280) / 233280);
+    for (let i = 0; i < 70; i++) { const sx = rnd() * 1080, sy = rnd() * 760, r = 1 + rnd() * 2.6; g.fillStyle = `rgba(255,248,220,${0.25 + rnd() * 0.6})`; g.beginPath(); g.arc(sx, sy, r, 0, Math.PI * 2); g.fill(); }
+    const rr = (x, yy, w, hh, r, col) => { g.fillStyle = col; g.beginPath(); g.roundRect ? g.roundRect(x, yy, w, hh, r) : g.rect(x, yy, w, hh); g.fill(); };
+    const rs = (x, yy, w, hh, r, col, lw) => { g.strokeStyle = col; g.lineWidth = lw || 2; g.beginPath(); g.roundRect ? g.roundRect(x, yy, w, hh, r) : g.rect(x, yy, w, hh); g.stroke(); };
+    g.textAlign = "left"; g.fillStyle = "#f2d98a"; g.font = "700 30px 'Gowun Dodum', sans-serif"; g.fillText("퀸장그루터기 · " + y + " 나의 그루터기", 56, 76);
+    // 발밑 빛나는 받침 (게임 캐릭터 선택 화면 느낌)
+    const PX = pal ? 400 : 380, PYd = pal ? 905 : 925, PR = pal ? 340 : 250;
+    const ped = g.createRadialGradient(PX, PYd, 10, PX, PYd, PR); ped.addColorStop(0, "rgba(255,240,180,.85)"); ped.addColorStop(0.6, "rgba(160,220,140,.35)"); ped.addColorStop(1, "rgba(160,220,140,0)");
+    g.fillStyle = ped; g.beginPath(); g.ellipse(PX, PYd, PR, PR / 4, 0, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = "rgba(255,236,170,.8)"; g.lineWidth = 4; g.beginPath(); g.ellipse(PX, PYd, PR * 0.8, PR * 0.19, 0, 0, Math.PI * 2); g.stroke();
+    // 캐릭터 (크게, 메인)
+    if (charImg) { g.save(); g.shadowColor = "rgba(0,0,0,.35)"; g.shadowBlur = 30; g.drawImage(charImg, pal ? -40 : 10, pal ? 110 : 100, pal ? 900 : 740, 900); g.restore(); }
+    // 레벨 배지 (미션 도장 기준)
+    const stampN = Number(c.t.stamp || 0), lv = 1 + Math.floor(stampN / 5);
+    rr(56, 106, 150, 64, 32, "rgba(0,0,0,.35)"); rs(56, 106, 150, 64, 32, "#f2c84b", 3);
+    g.fillStyle = "#f2c84b"; g.font = "800 38px 'Gowun Dodum', sans-serif"; g.fillText("Lv." + lv, 82, 152);
+    // 오른쪽: 아이템 칸 (작게)
+    const IX = 790, IW = 250, list2 = items.slice(0, 27), PH = 110 + Math.max(1, Math.ceil(list2.length / 3)) * 92 + (items.length > list2.length ? 40 : 0);
+    rr(IX - 18, 100, IW + 36, PH, 30, "rgba(0,0,0,.28)"); rs(IX - 18, 100, IW + 36, PH, 30, "rgba(242,217,138,.45)", 2);
+    g.fillStyle = "#f2d98a"; g.font = "700 30px 'Gowun Dodum', sans-serif"; g.fillText(`🎒 아이템 ${items.length}`, IX, 152);
+    const slot = 74, gap = 14;
+    list2.forEach((it, i) => {
+      const col = i % 3, row = Math.floor(i / 3), sx = IX + col * (slot + gap), sy = 180 + row * (slot + 18);
+      rr(sx, sy, slot, slot, 16, "rgba(255,255,255,.12)"); rs(sx, sy, slot, slot, 16, "rgba(242,217,138,.55)", 2);
+      const e = [...it][0] === "'" ? it : it.split(" ")[0];
+      g.textAlign = "center"; g.fillStyle = "#fff"; g.font = "40px sans-serif"; g.fillText(e, sx + slot / 2, sy + 52);
+      const nm = it.slice(e.length).trim().replace(/['"]/g, ""); g.fillStyle = "rgba(255,248,225,.85)"; g.font = "15px 'Gowun Dodum', sans-serif"; let nt = nm; while (nt.length > 1 && g.measureText(nt).width > slot + 10) nt = nt.slice(0, -1); g.fillText(nt === nm ? nm : nt.slice(0, -1) + "…", sx + slot / 2, sy + slot + 15);
+      g.textAlign = "left";
+    });
+    if (!list2.length) { g.fillStyle = "rgba(255,248,225,.75)"; g.font = "24px 'Gowun Dodum', sans-serif"; g.fillText("미션으로 모아요 🌱", IX, 210); }
+    if (items.length > list2.length) { g.fillStyle = "rgba(255,248,225,.75)"; g.font = "22px 'Gowun Dodum', sans-serif"; g.fillText(`+${items.length - list2.length}개 더`, IX, 100 + PH - 22); }
+    // 이름표 (캐릭터 아래)
+    const name = S.profile?.name || "익명", ttl = (S.profile && TITLE_TXT[mySkins().title]) || "";
+    g.textAlign = "center"; g.fillStyle = "#fff8e4"; g.font = "800 62px 'Gowun Dodum', sans-serif"; g.save(); g.shadowColor = "rgba(0,0,0,.5)"; g.shadowBlur = 12; g.fillText(clip(name, 8), 380, 1052); g.restore();
+    if (ttl) { g.font = "700 28px 'Gowun Dodum', sans-serif"; const tw = g.measureText(ttl).width + 44; rr(380 - tw / 2, 1068, tw, 46, 23, mySkins().title === "tree" ? "#f2c84b" : "rgba(255,241,196,.92)"); g.fillStyle = "#6b4510"; g.fillText(ttl, 380, 1100); }
+    g.textAlign = "left";
+    // 아래: 능력치 바 (게임 스탯처럼)
+    const PY = 1130; rr(40, PY, 1000, 190, 26, "rgba(0,0,0,.32)");
+    const meta = `🔥 최고 연속 ${c.st.best}일 · 📚 다 읽은 책 ${c.books.length}권 · 📖 성경 인물 ${dex.length}명`;
+    g.fillStyle = "#f2d98a"; g.font = "700 24px 'Gowun Dodum', sans-serif"; g.fillText(meta, 64, PY + 36);
+    rows.forEach(([e, l, n, goal, col], i) => {
+      const cx = 64 + i * 196, yy = PY + 92, BW = 170, w = Math.max(8, Math.min(1, n / goal) * BW);
+      g.fillStyle = "#fff8e4"; g.font = "700 24px 'Gowun Dodum', sans-serif"; g.fillText(`${e} ${l.split(" ")[0]}`, cx, yy);
+      g.fillStyle = "#fff"; g.font = "800 40px 'Gowun Dodum', sans-serif"; g.fillText(Number(n).toLocaleString(), cx, yy + 46);
+      rr(cx, yy + 62, BW, 14, 7, "rgba(255,255,255,.18)"); rr(cx, yy + 62, w, 14, 7, col);
+    });
+    g.textAlign = "right"; g.fillStyle = "rgba(255,248,225,.6)"; g.font = "20px 'Gowun Batang', serif"; g.fillText("거룩한 씨가 이 땅의 그루터기니라 · 사 6:13", 1030, 1342);
+    const url = cv.toDataURL("image/png");
+    const share = async () => {
+      try { const blob = await (await fetch(url)).blob(), file = new File([blob], `나의그루터기-${y}.png`, { type: "image/png" });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: `${y} 나의 그루터기` }); else toast("이 브라우저는 바로 공유가 안 돼요. 저장한 뒤 카톡으로 보내 주세요");
+      } catch (e) { if (e.name !== "AbortError") toast("공유하지 못했어요"); }
+    };
+    holder.replaceChildren(h("img", { class: "al-card", src: url, alt: "나의 그루터기 카드" }),
+      h("div", { class: "modal-actions" }, h("a", { class: "btn primary", href: url, download: `나의그루터기-${y}.png`, text: "💾 그림으로 저장" }), h("button", { class: "btn ghost", text: "📤 공유하기", onclick: share })));
+  }, 30);
+  return [h("p", { class: "muted tiny", text: `${y}년 기록과 지금 내 캐릭터로 만든 카드예요. 저장해서 친구들에게 자랑해요 🌱` }), holder];
 }
+
+// ---- 🌱 오늘의 그루터기: 그날 처음 들어올 때 한 번 (미션·말씀 / 공지·모임 / 내 소식 / 광고 한 장) ----
+let WC = { pages: [], i: 0 };
+async function maybeWelcome() {
+  if (store.get("wcDay", "") === nyDay() || !$("#entryModal").hidden) return;
+  store.set("wcDay", nyDay());
+  const pages = [], v = todayVerse(), list = todayMissions();
+  pages.push(() => [h("div", { class: "wc-h", text: "🎯 오늘의 미션" }),
+    h("ul", { class: "al-list" }, ...list.map((x) => h("li", { class: x.done ? "done" : "" }, h("span", { class: "mc-chk", text: x.done ? "✓" : x.e }), h("span", { class: "t" }, x.t, h("small", { text: x.how })), x.done ? h("b", { class: "ok", text: "완료" }) : h("button", { class: "btn ghost sm", text: "가기", onclick: () => { closeModal("welcomeModal"); x.go(); } })))),
+    h("p", { class: "muted tiny", text: "3개를 다 하면 🎁 선물 상자가 열려요 (가끔 ✨ 성경 인물 착장!)" }),
+    v ? h("div", { class: "wc-verse" }, h("p", { text: v.text }), h("small", { text: v.ref + " (개역한글)" })) : null]);
+  let notes = [];
+  try { notes = (await api.listNotices(null)).slice(0, 3); } catch (e) {}
+  const ev = (EVENTS || []).filter((e) => new Date(e.ends_at) > Date.now()).slice(0, 3);
+  if (notes.length || ev.length) pages.push(() => [h("div", { class: "wc-h", text: "📢 공지 · 다가오는 모임" }),
+    notes.length ? h("ul", { class: "recent-list" }, ...notes.map((n) => h("li", {}, h("span", { class: "t", text: n.content }), h("small", { text: timeAgo(n.created_at) })))) : null,
+    ev.length ? h("ul", { class: "recent-list" }, ...ev.map((e) => h("li", {}, h("span", { class: "t", text: "📅 " + e.title }), h("small", { text: new Date(e.starts_at).toLocaleString("ko-KR", { month: "short", day: "numeric", weekday: "short", hour: "numeric", minute: "2-digit" }) })))) : null]);
+  const c = skinCtx(), st = c.st, nextStreak = [5, 14, 30].find((n) => st.best < n), sn = seasonNow();
+  pages.push(() => [h("div", { class: "wc-h", text: "🔥 내 소식" }),
+    h("div", { class: "al-streak" }, h("div", {}, h("b", { text: `🔥 ${st.cur}일` }), h("span", { text: "연속 출석" })), h("div", {}, h("b", { text: `✅ ${c.t.stamp}개` }), h("span", { text: "미션 도장" })), h("div", {}, h("b", { text: `🎁 ${giftCollected().size}` }), h("span", { text: "모은 선물" }))),
+    nextStreak ? h("p", { class: "wc-tip", text: `🌱 ${nextStreak - st.cur > 0 ? nextStreak - st.cur : 1}일만 더 오면 머리 위 새싹이 ${nextStreak === 5 ? "생겨요" : "자라요"}!` }) : null,
+    stampNextEl(c), giftStatusEl(),
+    sn ? h("p", { class: "wc-tip", text: `${sn.e} 지금은 ${sn.name} 한정 미션 기간이에요 → 받는 스킨: ${sn.skin}` }) : null]);
+  const A = W.AD, showAd = dIdx(nyDay()) % 2 === 0 && A && A.img;
+  pages.push(() => showAd
+    ? [h("div", { class: "wc-h" }, "🧦 ", A.title, h("span", { class: "ad-tag", text: "광고" })), h("img", { class: "ad-img", src: A.img, alt: A.title }), h("p", { class: "muted", text: A.sub }), h("a", { class: "btn primary wide", href: A.url, target: "_blank", rel: "noopener", text: "🛒 보러 가기" })]
+    : [h("div", { class: "wc-h" }, "🧀 Cheese Mellow Bites", h("span", { class: "ad-tag", text: "광고" })), h("img", { class: "show-poster", src: "cheese-mellow-poster.jpg", alt: "치즈멜로바이트" }), h("p", { class: "muted", text: `쫀득한 치즈 쿠키 · 200g $${CM_PRICE.s} · 450g $${CM_PRICE.l} · 수익금은 청년부 음료수 회비 🥤` }),
+      h("div", { class: "modal-actions" }, h("button", { class: "btn primary", text: "🛒 주문하기", onclick: () => { closeModal("welcomeModal"); openOrder(); } }), h("button", { class: "btn ghost", text: "🚪 쇼룸 가기", onclick: () => { closeModal("welcomeModal"); goShowroom(false); } }))]);
+  WC = { pages, i: 0 }; renderWelcome(); openModal("welcomeModal");
+}
+function renderWelcome() {
+  const p = WC.pages[WC.i]; if (!p) return;
+  $("#wcBody").replaceChildren(...p().filter(Boolean));
+  $("#wcDots").replaceChildren(...WC.pages.map((_, i) => h("i", { class: i === WC.i ? "on" : "", onclick: () => { WC.i = i; renderWelcome(); } })));
+  $("#wcPrev").disabled = WC.i === 0; $("#wcNext").textContent = WC.i === WC.pages.length - 1 ? "✓" : "›";
+}
+$("#wcPrev").onclick = () => { if (WC.i > 0) { WC.i--; renderWelcome(); } };
+$("#wcNext").onclick = () => { if (WC.i < WC.pages.length - 1) { WC.i++; renderWelcome(); } else closeModal("welcomeModal"); };
+$("#wcClose").onclick = () => closeModal("welcomeModal");
+(() => { let sx = null; const el = $("#wcBody"); el.addEventListener("touchstart", (e) => (sx = e.touches[0].clientX), { passive: true }); el.addEventListener("touchend", (e) => { if (sx == null) return; const dx = e.changedTouches[0].clientX - sx; sx = null; if (Math.abs(dx) > 50) { if (dx < 0) $("#wcNext").click(); else $("#wcPrev").click(); } }); })();
+
 $("#albumBtn").onclick = () => openAlbum();
 
 /* ================= 🧀 치즈멜로바이트 쇼룸 · 쫀득쿠키 만들기 · 주문 (2026-11-17) ================= */
@@ -3858,11 +4059,27 @@ let cookieN = null;
 async function loadCookie() {
   try { cookieN = await api.cookieCount(); W.setCookieCount(cookieN); } catch (e) { console.warn("쇼룸 숫자 (supabase-update-missions.sql 실행 여부 확인):", e.message); }
   if (!$("#showModal").hidden) renderShow();
+  if (S.room === "showroom") renderShowPanel();
 }
-function goShowroom(open) {
-  closeModal("albumModal");
-  const go = () => { W.walkTo(W.SHOW.x, W.SHOW.z + 3.6); toast("🧀 치즈멜로바이트 쇼룸으로 가요"); if (open) setTimeout(openShowroom, 500); };
-  if (S.room !== "yard") { joinRoom("yard", S.room); setTimeout(go, 700); } else go();
+// 쇼룸 안으로 (마당에 있으면 문까지 걸어가고, 다른 방이면 바로 들어가요)
+function goShowroom(play) {
+  closeModal("albumModal"); closeModal("showModal");
+  if (S.room === "showroom") { if (play) startCookie(); return; }
+  if (S.room === "yard") { W.goDoor("showroom"); toast("🧀 치즈멜로바이트 쇼룸으로 들어가요"); }
+  else joinRoom("showroom", S.room);
+  if (play) { const t0 = Date.now(), wait = setInterval(() => { if (S.room === "showroom") { clearInterval(wait); setTimeout(startCookie, 600); } else if (Date.now() - t0 > 20000) clearInterval(wait); }, 400); }
+}
+function renderShowPanel() {
+  const box = $("#showPanelBody"); if (!box) return;
+  box.replaceChildren(
+    h("img", { class: "show-poster", src: "cheese-mellow-poster.jpg", alt: "Cheese Mellow Bites" }),
+    h("div", { class: "show-prices" },
+      h("button", { class: "pc", onclick: () => openOrder("s") }, h("b", { text: "200g" }), h("span", { class: "won", text: `$${CM_PRICE.s}` }), h("small", { text: "눌러서 주문" })),
+      h("button", { class: "pc", onclick: () => openOrder("l") }, h("b", { text: "450g" }), h("span", { class: "won", text: `$${CM_PRICE.l}` }), h("small", { text: "눌러서 주문" }))),
+    h("p", { class: "truck-note", text: "🥤 수익금은 청년부 음료수 회비로 쓰여요" }),
+    h("p", { class: "tiny-help", text: "왼쪽·뒤쪽 진열장 상자를 누르면 주문, 오른쪽 아일랜드 작업대를 누르면 쫀득쿠키를 만들어 봐요. 가운데 큰 치즈는 그냥 귀여워요 🧀" }),
+    h("p", { class: "muted tiny", text: cookieN == null ? "" : `🧀 청년부가 게임에서 만든 박스: ${Number(cookieN).toLocaleString()}개` }),
+    h("details", { class: "show-ingr" }, h("summary", { text: "재료 · 알레르기 (Ingredients)" }), h("p", { text: CM_INGR }), h("b", { text: "CONTAINS: WHEAT, MILK AND SOY." })));
 }
 function openShowroom() { renderShow(); openModal("showModal"); loadCookie(); }
 function renderShow() {
@@ -3875,7 +4092,7 @@ function renderShow() {
     h("p", { class: "truck-note", text: "🥤 수익금은 청년부 음료수 회비로 쓰여요" }),
     h("div", { class: "truck-actions" },
       h("button", { class: "btn primary", text: "🛒 주문하기 (연락처 남기면 연락드려요)", onclick: () => { closeModal("showModal"); openOrder(); } }),
-      h("button", { class: "btn ghost", text: "🎮 쫀득쿠키 만들어 보기 (게임)", onclick: () => { closeModal("showModal"); startCookie(); } })),
+      h("button", { class: "btn ghost", text: S.room === "showroom" ? "🎮 쫀득쿠키 만들어 보기 (게임)" : "🚪 쇼룸 안으로 들어가기", onclick: () => (S.room === "showroom" ? (closeModal("showModal"), startCookie()) : goShowroom(false)) })),
     h("p", { class: "muted tiny", text: cookieN == null ? "" : `🧀 청년부가 게임에서 만든 박스: ${Number(cookieN).toLocaleString()}개` }),
     h("details", { class: "show-ingr" }, h("summary", { text: "재료 · 알레르기 (Ingredients)" }), h("p", { text: CM_INGR }), h("b", { text: "CONTAINS: WHEAT, MILK AND SOY." })));
 }
@@ -3884,8 +4101,8 @@ function renderShow() {
 const CG_STEPS = ["🔥 마시멜로 녹이기", "🥛 탈지분유·체다 가루 섞기", "🍘 치즈 크래커 섞기", "🧊 틀에 넣고 냉동", "🔪 자르기", "🎀 포장하기"];
 const CG = { step: 0, raf: 0 };
 function startCookie() {
-  if (S.room !== "yard") { goShowroom(false); setTimeout(startCookie, 1500); return; }
-  const seat = ["CM-0", "CM-1"].find((id) => W.seatFree(id) || S.seat === id);
+  if (S.room !== "showroom") { goShowroom(true); return; }
+  const seat = ["CM-0", "CM-1", "CM-2", "CM-3"].find((id) => S.seat === id) || ["CM-0", "CM-1", "CM-2", "CM-3"].find((id) => W.seatFree(id));
   if (seat) { const st = W.room.seats[seat]; W.moveMe({ x: st.x, z: st.z, seat }); }
   S.cookieing = true; S.bubble = "🧀 쫀득쿠키 만드는 중!"; S.kind = "status"; S.amens = 0; refreshMe();
   Object.assign(CG, { step: 0, moving: false, melt: 0, burn: 0, milk: 0, ched: 0, mix: 0, crack: 0, mix2: 0, press: Array(9).fill(false), freeze: 0, freezing: false, cuts: [], err: [], size: "s", ribbon: "#d9483b", tag: true, done: false, t0: performance.now() });
@@ -3895,7 +4112,7 @@ function stopCookie() {
   cancelAnimationFrame(CG.raf); CG.raf = 0; clearInterval(CG.ft);
   if (!S.cookieing) return; S.cookieing = false;
   if (S.bubble === "🧀 쫀득쿠키 만드는 중!") { S.bubble = ""; refreshMe(); }
-  if (S.seat === "CM-0" || S.seat === "CM-1") W.stand();
+  if (/^CM-/.test(S.seat || "")) W.stand();
 }
 // 단계 넘기기: 같은 단계에서 여러 번 불려도 한 번만 넘어가요 (빨리 톡톡 눌러도 단계를 건너뛰지 않게)
 function cgNext(from) { if (CG.step !== from || CG.moving) return; CG.moving = true; setTimeout(() => { CG.moving = false; if (CG.step !== from) return; CG.step++; cancelAnimationFrame(CG.raf); CG.raf = 0; renderCG(); }, 450); }
@@ -4006,11 +4223,11 @@ async function cgFinish() {
 
 // ---- 🛒 주문서 ----
 const ORD = { s: 1, l: 0, pickup: "church" };
-function openOrder() {
+function openOrder(size) {
   const p = S.profile || {};
   if (!$("#ordName").value) $("#ordName").value = p.name || "";
   $("#ordContact").value = $("#ordContact").value || store.get("ordContact", "");
-  ORD.s = 1; ORD.l = 0; renderOrder(); $("#ordForm").hidden = false; $("#ordDone").hidden = true;
+  ORD.s = size === "l" ? 0 : 1; ORD.l = size === "l" ? 1 : 0; renderOrder(); $("#ordForm").hidden = false; $("#ordDone").hidden = true;
   openModal("orderModal");
 }
 function renderOrder() {
@@ -4099,7 +4316,110 @@ function openAd() {
   $("#adTitle").textContent = "🧦 " + A.title;
   openModal("adModal");
 }
-$$("[data-go-show]").forEach((b) => (b.onclick = () => goShowroom(true)));
+$$("[data-go-show]").forEach((b) => (b.onclick = () => goShowroom(false)));
+$$("[data-order-open]").forEach((b) => (b.onclick = () => openOrder()));
+$$("[data-cookie-play]").forEach((b) => (b.onclick = () => startCookie()));
+
+/* ================= ⛸ 그루터기 스케이트장 (2026-11-18) ================= */
+// 얼음 위에 서면 아래에 스케이트 막대가 나와요. 🏁 스피드 경주(2바퀴) · 피겨 기술. 서버 저장 없이 실시간 방송("sport" k:"skstart") + 내 상태(skr, fig)만 써요
+var SK = { race: null, tick: null, lastSend: 0, best: store.get("skBest", null), barKey: "" };
+const RACE_LAPS = 2;
+function onIceMe() { const a = S.room === "yard" && W.actorPos(myId); return !!a && W.onIce(a.x, a.z); }
+function goRink() {
+  closeModal("albumModal");
+  const go = () => { W.walkTo(W.RINK.cx, W.RINK.cz + W.RINK.b - 2); toast("⛸ 스케이트장으로 가요"); };
+  if (S.room !== "yard") { joinRoom("yard", S.room); setTimeout(go, 700); } else go();
+}
+function skState() { return SK.race ? { t0: SK.race.t0, p: +SK.race.p.toFixed(3), v: +SK.race.v.toFixed(2), lane: SK.race.lane, done: SK.race.done || 0 } : null; }
+function skSend(force) { const now = Date.now(); if (!force && now - SK.lastSend < 250) return; SK.lastSend = now; S.peers = S.peers.filter((p) => p.id !== myId).concat(meState()); api.update(meState()); }
+// 🏁 경주 시작: 지금 얼음 위에 있는 사람 모두가 참가 (3.5초 뒤 출발)
+function skStartRace() {
+  if (SK.race) return;
+  const ids = S.peers.filter((p) => { const a = W.actorPos(p.id); return a && W.onIce(a.x, a.z) && !p.skr; }).map((p) => p.id).slice(0, 4);
+  if (!ids.includes(myId)) ids.unshift(myId);
+  const m = { k: "skstart", t0: Date.now() + 3500, ids, by: myId, name: clip(S.profile?.name, LIMIT.name) || "익명" };
+  api.sendSport(m); onSkStart(m);
+}
+function onSkStart(m) {
+  if (!Array.isArray(m.ids) || !Number.isFinite(m.t0)) return;
+  const lane = m.ids.indexOf(myId);
+  if (lane < 0) { if (onIceMe()) toast(`🏁 ${clip(m.name, 10)}님이 스피드 경주를 시작해요! 구경해요 👀`); return; }
+  if (SK.race) return;
+  S.seat = null; S.dance = null; S.fig = null;
+  SK.race = { t0: m.t0, lane: Math.min(3, lane), p: 0, v: 0, foot: null, done: 0, ids: m.ids, ended: false };
+  W.raceMe = skState(); W.keyBlock = true;
+  [3, 2, 1].forEach((n, i) => setTimeout(() => SK.race && toast(n === 1 ? "1… 🏁" : `${n}…`), Math.max(0, m.t0 - Date.now() - 3000 + i * 1000)));
+  setTimeout(() => SK.race && toast("출발! ⏪⏩ 왼발·오른발을 번갈아 눌러요 (← → 키도 돼요)"), Math.max(0, m.t0 - Date.now()));
+  clearInterval(SK.tick); let last = performance.now();
+  SK.tick = setInterval(() => {
+    const R = SK.race; if (!R) { clearInterval(SK.tick); return; }
+    const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000); last = now;
+    if (Date.now() >= R.t0 && !R.done) {
+      R.v *= Math.exp(-0.55 * dt);
+      R.p += (R.v * dt) / W.rinkLapLen(R.lane);
+      if (R.p >= RACE_LAPS) { R.p = RACE_LAPS; R.done = Date.now(); R.v = 0; const sec = (R.done - R.t0) / 1000; const pb = !SK.best || sec < SK.best; if (pb) { SK.best = sec; store.set("skBest", sec); } toast(`🏁 결승! ${sec.toFixed(2)}초${pb ? " · 🎉 내 최고 기록!" : ""}`); S.bubble = `⛸ ${RACE_LAPS}바퀴 ${sec.toFixed(1)}초!`; S.kind = "status"; S.amens = 0; skSend(true); }
+    }
+    W.raceMe = skState(); skSend(false); renderSkateBar();
+    // 모두 들어오거나 90초가 지나면 결과 발표 후 끝
+    const racers = S.peers.filter((p) => R.ids.includes(p.id)), others = racers.filter((p) => p.id !== myId);
+    const allDone = R.done && others.every((p) => p.skr && p.skr.t0 === R.t0 && p.skr.done);
+    if (!R.ended && R.done && (allDone || Date.now() - R.t0 > 90000 || Date.now() - R.done > 25000)) { R.ended = true; skResults(); }
+  }, 50);
+  renderSkateBar(true);
+}
+function skPush(foot) {
+  const R = SK.race; if (!R || R.done || Date.now() < R.t0) return;
+  R.v = Math.min(12, R.v + (R.foot && R.foot !== foot ? 1.1 : 0.25)); R.foot = foot;
+  const b = $(`#skateBar [data-foot="${foot}"]`); if (b) { b.classList.add("hit"); setTimeout(() => b.classList.remove("hit"), 90); }
+}
+function skResults() {
+  const R = SK.race; if (!R) return;
+  const rows = S.peers.filter((p) => R.ids.includes(p.id)).map((p) => { const st = p.id === myId ? skState() : p.skr; return { name: (clip(p.name, LIMIT.name) || "익명") + (p.id === myId ? " (나)" : ""), sec: st && st.t0 === R.t0 && st.done ? (st.done - R.t0) / 1000 : null, p: st ? st.p : 0 }; })
+    .sort((a, b) => (a.sec ?? 1e9) - (b.sec ?? 1e9) || b.p - a.p);
+  const medal = ["🥇", "🥈", "🥉", "4️⃣"];
+  toast("🏁 결과 · " + rows.map((r, i) => `${medal[i] || ""} ${r.name} ${r.sec ? r.sec.toFixed(1) + "초" : "완주 못함"}`).join("  "));
+  setTimeout(skEnd, 4000);
+}
+function skEnd() {
+  const R = SK.race; if (!R) return;
+  const q = W.rinkRacePos(R.p, R.lane);
+  SK.race = null; W.raceMe = null; W.keyBlock = false; clearInterval(SK.tick);
+  S.pos = { x: +q.x.toFixed(2), z: +q.z.toFixed(2) }; S.seat = null; W.placeMe(S.pos.x, S.pos.z);
+  refreshMe(); renderSkateBar(true);
+}
+function skFigure(k) {
+  if (SK.race || !onIceMe()) return;
+  S.fig = { k, t0: Date.now() }; refreshMe();
+  const F = W.FIGURES[k];
+  SK.combo = (SK.combo || []).filter((x) => Date.now() - x.t < 20000).concat({ k, t: Date.now() });
+  const kinds = new Set(SK.combo.map((x) => x.k)).size;
+  if (k === "bow" && SK.combo.length > 2) { const sc = Math.min(10, 6 + kinds * 0.7 + Math.random() * 0.8).toFixed(1); toast(`🙇 연기 끝! 🏅 예술 점수 ${sc}점`); S.bubble = `⛸ 피겨 예술 점수 ${sc}점!`; S.kind = "status"; S.amens = 0; SK.combo = []; refreshMe(); }
+  else toast(`${F.name}!`);
+  setTimeout(() => { if (S.fig && S.fig.t0 && Date.now() - S.fig.t0 >= F.dur * 1000 - 50) { S.fig = null; refreshMe(); } }, F.dur * 1000 + 30);
+}
+function renderSkateBar(force) {
+  const bar = $("#skateBar"); if (!bar) return;
+  const ice = onIceMe(), R = SK.race;
+  if (!ice && !R) { if (!bar.hidden) bar.hidden = true; SK.barKey = ""; return; }
+  const key = R ? `r|${R.done ? "d" : Date.now() < R.t0 ? "w" : "go"}|${Math.floor(R.p * 20)}` : "f";
+  const lap = R ? Math.min(RACE_LAPS, Math.floor(R.p) + 1) : 0, sec = R ? Math.max(0, ((R.done || Date.now()) - R.t0) / 1000) : 0;
+  const rt = R ? (R.done ? `🏁 결승 ${sec.toFixed(2)}초 · 다른 선수 기다리는 중…` : Date.now() < R.t0 ? "🏁 곧 출발해요!" : `⛸ ${lap}/${RACE_LAPS}바퀴 · ${sec.toFixed(1)}초`) : "";
+  if (!force && key === SK.barKey) { const t = R && bar.querySelector(".sb-t"); if (t && t.textContent !== rt) t.textContent = rt; return; }
+  SK.barKey = key; bar.hidden = false;
+  if (R) {
+    bar.replaceChildren(...[h("span", { class: "sb-t", text: rt }),
+      h("div", { class: "sk-prog" }, h("i", { style: `width:${(R.p / RACE_LAPS) * 100}%` })),
+      h("button", { class: "btn primary sk-foot", "data-foot": "L", text: "⏪ 왼발", onpointerdown: (e) => { e.preventDefault(); skPush("L"); } }),
+      h("button", { class: "btn primary sk-foot", "data-foot": "R", text: "오른발 ⏩", onpointerdown: (e) => { e.preventDefault(); skPush("R"); } }),
+      R.done ? h("button", { class: "btn ghost sm", text: "끝내기", onclick: skEnd }) : null].filter(Boolean));
+    return;
+  }
+  bar.replaceChildren(h("span", { class: "sb-t", text: `⛸ 스케이트장${SK.best ? ` · 내 최고 ${SK.best.toFixed(1)}초` : ""}` }),
+    h("button", { class: "btn primary sm", text: "🏁 스피드 경주 시작", title: "지금 얼음 위에 있는 친구들과 같이 (최대 4명) · 혼자면 기록 재기", onclick: skStartRace }),
+    ...Object.entries(W.FIGURES).map(([k, F]) => h("button", { class: "btn ghost sm", text: F.name, onclick: () => skFigure(k) })));
+}
+document.addEventListener("keydown", (e) => { if (!SK.race || e.repeat) return; if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") { e.preventDefault(); skPush("L"); } if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") { e.preventDefault(); skPush("R"); } });
+setInterval(() => { if (S.room === "yard") renderSkateBar(); else if (!$("#skateBar").hidden) $("#skateBar").hidden = true; }, 400);
 
 /* ================= 🗺 마당 지도 ================= */
 // 마당을 위에서 내려다본 간단한 지도. 누르면 그곳으로 걸어가요 (다른 방에 있으면 먼저 마당으로 나와요).
@@ -4114,9 +4434,10 @@ const MAP_POI = [
   { k: "walk", x: 7.8, z: 10.2, e: "🧦", t: "광고판", season: "christmas" },
   { k: "walk", x: -8.4, z: 12.2, e: "📅", t: "모임 시간표" },
   { k: "walk", x: -19.5, z: -6.2, e: "🐱", t: "고양이 콘도" },
-  { k: "show", x: -30.6, z: -5.2, e: "🧀", t: "치즈멜로 쇼룸" },
+  { k: "door", to: "showroom", x: -30.6, z: -5.2, e: "🧀", t: "치즈멜로 쇼룸", up: 0 },
   { k: "sled", x: 26.5, z: -32, e: "🛷", t: "눈썰매 · 놀이터" },
   { k: "walk", x: 28.6, z: -21.7, e: "🎠", t: "그네" },
+  { k: "walk", x: 43, z: -11.5, e: "⛸", t: "스케이트장" },
   { k: "walk", x: 22.9, z: 4.0, e: "🐙", t: "타코야끼" },
   { k: "walk", x: 29.1, z: 4.0, e: "🐟", t: "붕어빵" },
   { k: "walk", x: -15, z: -27.5, e: "🏀", t: "농구장" },
@@ -4125,18 +4446,20 @@ const MAP_POI = [
 ];
 function renderMap() {
   const NS = "http://www.w3.org/2000/svg", svg = document.createElementNS(NS, "svg");
-  svg.setAttribute("viewBox", "-37 -45 71 68"); svg.setAttribute("class", "map-svg");
+  svg.setAttribute("viewBox", "-37 -45 92 68"); svg.setAttribute("class", "map-svg");
   const el = (tag, at, txt) => { const e = document.createElementNS(NS, tag); for (const k in at) e.setAttribute(k, at[k]); if (txt != null) e.textContent = txt; svg.append(e); return e; };
-  el("rect", { x: -37, y: -45, width: 71, height: 68, fill: "#cfe6b8" });
+  el("rect", { x: -37, y: -45, width: 92, height: 68, fill: "#cfe6b8" });
+  el("rect", { x: 35, y: -36, width: 16, height: 30, fill: "#e4f4fb", stroke: "#fbfbf7", "stroke-width": 0.5, rx: 3 }); // ⛸ 스케이트장
+  el("ellipse", { cx: 43, cy: -21, rx: 5.4, ry: 11.8, fill: "none", stroke: "#d9483b", "stroke-width": 0.2 });
   el("rect", { x: -26, y: -42.5, width: 46, height: 21.5, fill: "#8b8f96", rx: 1 }); // 운동장 아스팔트
   el("text", { x: -1, y: -43.2, class: "mt", "text-anchor": "middle" }, "⛹️ 운동장 (건물 뒤)");
   for (const [x0, z0, x1, z1] of [[-22.5, -36.2, -7.5, -21.5], [-1.5, -41.5, 8.5, -21.5], [12, -34.9, 18.1, -21.5]]) el("rect", { x: x0, y: z0, width: x1 - x0, height: z1 - z0, fill: "none", stroke: "#fff", "stroke-width": 0.25 });
   el("rect", { x: -15, y: -19, width: 30, height: 15, fill: "#b4583f", rx: 0.6 }); // 교회 건물
   el("rect", { x: -14.2, y: -6, width: 3.2, height: 3.2, fill: "#f1eee8" }); // 첨탑
   el("text", { x: 0, y: -11, class: "mt big", "text-anchor": "middle", fill: "#fff" }, "⛪ 교회 건물");
-  el("rect", { x: -37, y: 12.6, width: 71, height: 0.9, fill: "#d6d2ca" }); // 보도
-  el("rect", { x: -37, y: 13.5, width: 71, height: 9, fill: "#55575c" }); // 앞길
-  el("line", { x1: -37, y1: 18, x2: 34, y2: 18, stroke: "#e8c23a", "stroke-width": 0.2, "stroke-dasharray": "2 1.5" });
+  el("rect", { x: -37, y: 12.6, width: 92, height: 0.9, fill: "#d6d2ca" }); // 보도
+  el("rect", { x: -37, y: 13.5, width: 92, height: 9, fill: "#55575c" }); // 앞길
+  el("line", { x1: -37, y1: 18, x2: 55, y2: 18, stroke: "#e8c23a", "stroke-width": 0.2, "stroke-dasharray": "2 1.5" });
   el("text", { x: 4, y: 21.2, class: "mt", "text-anchor": "middle", fill: "#fff" }, "🚗 앞길 (차가 다녀요)");
   el("rect", { x: -3.6, y: -4, width: 1.2, height: 16.6, fill: "#e4e0d8" }); el("rect", { x: 8.4, y: -4, width: 1.2, height: 16.6, fill: "#e4e0d8" }); // 길
   el("rect", { x: 20.3, y: -42.9, width: 11.6, height: 22.8, fill: "#e3eef5", rx: 0.6 }); // 놀이터 (배드민턴장 오른쪽)
@@ -4212,7 +4535,10 @@ W.init($("#viewport"), $("#overlay"), {
     if (a.startsWith("cat:")) { const c = W.petCat(+a.slice(4)); if (c) toast(`${c.name} ${c.sex || ""} · ${c.desc}: 냐옹~ 🐾`); }
     if (a === "catfood") openCatFood();
     if (a === "showroom") openShowroom();
-    if (a.startsWith("pet:")) { const pi = W.petOf(a.slice(4)); if (pi) { W.petCat(pi.i); const c = W.CATS[pi.i]; toast(`🐱 ${c.name}${pi.owner ? `가 ${clip(pi.owner, 10)}님을` : "가 누군가를"} 졸졸 따라다녀요 💕`); } }
+    if (a === "buy:s" || a === "buy:l") openOrder(a.slice(4));
+    if (a === "cookie") startCookie();
+    if (a === "rink") { if (onIceMe()) toast("⛸ 아래 막대에서 경주를 시작하거나 피겨 기술을 해 봐요!"); else goRink(); }
+    if (a.startsWith("pet:")) { const pi = W.petOf(a.slice(4)); if (pi && pi.i === 99) toast(`🦁 다니엘의 사자예요. 사자들의 입을 봉하셨어요 (다니엘 6:22)`); else if (pi) { W.petCat(pi.i); const c = W.CATS[pi.i]; toast(`🐱 ${c.name}${pi.owner ? `가 ${clip(pi.owner, 10)}님을` : "가 누군가를"} 졸졸 따라다녀요 💕`); } }
     if (a === "court:bb" || a === "ball:bb") bbGoToBall();
     if (a === "schedule") openSched();
     if (a === "thanks") openThanks();
@@ -4261,7 +4587,7 @@ setInterval(() => {
 renderMeChip();
 setInterval(() => { if (document.visibilityState === "visible" && S.room === "yard") loadCookie(); }, 30e3);
 setInterval(() => { if (started) { missionCheck(); renderMissionBits(); } }, 60e3); // 자정이 지나면 새 미션
-if (S.profile) { started = true; joinRoom("yard", "def"); loadMissions(); } else { W.setRoom("yard"); $$(".panel").forEach((p) => (p.hidden = p.dataset.room !== "yard")); openEntry(true); }
+if (S.profile) { started = true; joinRoom("yard", "def"); loadMissions().then(() => setTimeout(maybeWelcome, 1200)); } else { W.setRoom("yard"); $$(".panel").forEach((p) => (p.hidden = p.dataset.room !== "yard")); openEntry(true); }
 loadFootprints();
 
 })();

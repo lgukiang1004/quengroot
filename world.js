@@ -16,11 +16,11 @@ const LOOK = {
   genders: [["m", "남자"], ["f", "여자"]],
   // 손에 드는 것 (교회에서 자주 보이는 것들)
   // 🔒 scroll(두루마리 성경) · basket(곡식 바구니)은 미션으로 받는 특별 아이템이에요 (app.js 🎯 미션)
-  items: [["none", "없음"], ["guitar", "🎸 기타"], ["tambourine", "🪘 탬버린"], ["coffee", "☕ 커피"], ["bible", "📖 성경책"], ["mic", "🎤 마이크"], ["scroll", "📜 두루마리 성경"], ["basket", "🌾 곡식 바구니"]],
+  items: [["none", "없음"], ["guitar", "🎸 기타"], ["tambourine", "🪘 탬버린"], ["coffee", "☕ 커피"], ["bible", "📖 성경책"], ["mic", "🎤 마이크"], ["scroll", "📜 두루마리 성경"], ["basket", "🌾 곡식 바구니"], ["grapes", "🍇 포도송이"]],
   // 착용 (머리·목) · 🔒 wheathat(밀 이삭 모자)은 맥추감사절 스킨
   wears: [["none", "없음"], ["santa", "🎅 산타 모자"], ["beanie", "🧶 털모자"], ["scarf", "🧣 목도리"], ["antlers", "🦌 루돌프 머리띠"], ["wheathat", "🌿 밀 이삭 모자"]],
   // ✨ 특별 스킨 (전부 미션으로 받아요)
-  halos: [["none", "없음"], ["sprout1", "🌱 새싹 하나"], ["sprout2", "🌱🌱 새싹 둘"], ["bud", "🌷 꽃봉오리 새싹"], ["star", "⭐ 베들레헴 별"]],
+  halos: [["none", "없음"], ["sprout1", "🌱 새싹 하나"], ["sprout2", "🌱🌱 새싹 둘"], ["bud", "🌷 꽃봉오리 새싹"], ["star", "⭐ 베들레헴 별"], ["rainbow", "🌈 언약의 무지개"]],
   shoulders: [["none", "없음"], ["dove", "🕊 비둘기"]],
   aprons: [["none", "없음"], ["cheese", "🧀 치즈 앞치마"]],
   pins: [["none", "없음"], ["lily", "🤍 백합 배지"]],
@@ -42,10 +42,11 @@ function safeLook(p) {
     pin: pick(p.pin, LOOK.pins.map((x) => x[0]), "none"),
     trail: pick(p.trail, LOOK.trails.map((x) => x[0]), "none"),
     pet: Number.isInteger(p.pet) && p.pet >= 0 && p.pet < 5 ? p.pet : -1, // 🐱 따라다니는 고양이 (CATS 번호)
+    costume: typeof p.costume === "string" && COSTUMES[p.costume] ? p.costume : "", // 🎁 오늘의 선물 (24시간)
   };
 }
 // 모양이 바뀌면 캐릭터를 다시 만들어요 (trail·pet은 몸에 붙는 게 아니라서 빼요)
-const lookKeyOf = (l) => [l.hair, l.hairColor, l.glasses, l.color, l.gender, l.item, l.wear, l.halo, l.shoulder, l.apron, l.pin].join("|");
+const lookKeyOf = (l) => [l.hair, l.hairColor, l.glasses, l.color, l.gender, l.item, l.wear, l.halo, l.shoulder, l.apron, l.pin, l.costume].join("|");
 
 /* ---------------- 재료 / 텍스처 ---------------- */
 const matCache = new Map();
@@ -179,7 +180,7 @@ function makeCharacter(lookIn) {
 
   // 머리카락
   // 모자(산타 모자·털모자)를 쓰면 모자 안에 들어갈 윗머리는 만들지 않아요 → 머리카락이 모자를 뚫고 나오지 않게
-  const hat = look.wear === "santa" || look.wear === "beanie" || look.wear === "wheathat";
+  const hat = look.wear === "santa" || look.wear === "beanie" || look.wear === "wheathat" || (COSTUMES[look.costume] && COSTUMES[look.costume].hat);
   const HAT_TS = Math.PI * 0.36; // 이 각도(위에서부터)보다 위쪽 머리는 모자 속
   const sph = (r, ps, pl, ts, tl) => {
     if (hat && ts < HAT_TS) { const end = ts + tl; ts = HAT_TS; tl = end - HAT_TS; if (tl <= 0.01) return new T.Group(); }
@@ -252,11 +253,82 @@ function makeCharacter(lookIn) {
     skirt.position.y = 0.3; skirt.castShadow = true; g.add(skirt);
     for (const sx of [-1, 1]) { const lash = new T.Mesh(new T.BoxGeometry(0.035, 0.008, 0.01), dark); lash.position.set(0.13 * sx, 0.03, 0.283); lash.rotation.z = sx * 0.5; eyesOpen.add(lash); }
   }
-  addWear(head, g, look.wear, look.color);
-  const hold = addItem(g, armL, armR, look.item);
+  const C = COSTUMES[look.costume];
+  if (!(C && C.hat)) addWear(head, g, look.wear, look.color);
+  // 🎁 오늘의 선물이 손에 드는 것이면 그날은 원래 들던 것 대신 그걸 들어요
+  const inHandC = (obj) => { obj.position.add(new T.Vector3(0, -0.33, 0.04)); armR.add(obj); };
+  const hold = C && C.hand ? C.make({ head, g, armL, armR, inHand: inHandC, look }) : addItem(g, armL, armR, look.item);
+  if (C && !C.hand) C.make({ head, g, armL, armR, inHand: inHandC, look });
   const sp = addSpecial(head, g, look);
   return { group: g, legL, legR, armL, armR, head, body, eyesOpen, eyesClosed, hold, halo: sp.halo, haloStar: sp.star, dove: sp.dove };
 }
+/* ---------------- 🎁 오늘의 선물: 하루짜리 꾸미기 · 희귀 성경 인물 착장 (2026-11-18) ---------------- */
+// make({ head, g, armL, armR, inHand }) 로 몸에 붙여요. hand: 손에 드는 것(그날은 원래 들던 것 대신) · hat: 머리 위를 덮음
+// ref: [책(1~66), 장, "표시"] · month: 그 달에만 나와요(12 = 성탄)
+const COSTUMES = (() => {
+  const C = {}, add = (id, o) => (C[id] = o);
+  const robe = (g, col, opt = {}) => { // 무릎까지 오는 겉옷
+    const m = opt.map ? new T.MeshStandardMaterial({ map: opt.map, roughness: 0.8, side: T.DoubleSide }) : M(col, 0.85, { side: T.DoubleSide });
+    const top = new T.Mesh(new T.CylinderGeometry(0.205, 0.265, 0.46, 16, 1, true), m); top.position.y = 0.55; g.add(top);
+    const low = new T.Mesh(new T.CylinderGeometry(0.265, 0.33, 0.36, 16, 1, true), m); low.position.y = 0.17; g.add(low);
+    return m;
+  };
+  const cape = (g, col, map) => { const c = new T.Mesh(new T.CylinderGeometry(0.22, 0.36, 0.72, 16, 1, true, Math.PI * 0.62, Math.PI * 0.76), map ? new T.MeshStandardMaterial({ map, roughness: 0.85, side: T.DoubleSide }) : M(col, 0.85, { side: T.DoubleSide })); c.position.y = 0.48; g.add(c); return c; };
+  const staff = (col = "#7a5230", h = 1.25) => { const s = new T.Group(); cyl(s, 0.018, 0.022, h, M(col, 0.7), 0, h / 2 - 0.25, 0, 6); return s; };
+  const crown = (head, col = "#f2c84b", gem = "#c0392b") => {
+    const gm = M(col, 0.25, { metalness: 0.7 }), c = new T.Group(); c.position.y = 0.27; head.add(c);
+    cyl(c, 0.2, 0.22, 0.09, gm, 0, 0.0, 0, 18);
+    for (let k = 0; k < 6; k++) { const a = (k / 6) * Math.PI * 2, sp = new T.Mesh(new T.ConeGeometry(0.035, 0.09, 4), gm); sp.position.set(Math.sin(a) * 0.2, 0.08, Math.cos(a) * 0.2); c.add(sp); }
+    const j = new T.Mesh(new T.SphereGeometry(0.025, 8, 6), M(gem, 0.2)); j.position.set(0, 0.0, 0.215); c.add(j);
+  };
+  const stripes = canvasTex(64, 256, (x, w, h) => { const cs = ["#d9483b", "#f2b632", "#3a8fd9", "#4f9a5a", "#8e44ad", "#e8862f", "#f6e7c8"]; for (let i = 0; i < 16; i++) { x.fillStyle = cs[i % cs.length]; x.fillRect(0, (i * h) / 16, w, h / 16 + 1); } }, [6, 1]);
+  const starsTex = canvasTex(128, 128, (x, w, h) => { x.fillStyle = "#1f2f5c"; x.fillRect(0, 0, w, h); x.fillStyle = "#fff6c8"; for (let i = 0; i < 40; i++) { x.beginPath(); x.arc((i * 53) % w, (i * 37) % h, 1.5 + (i % 3), 0, 7); x.fill(); } }, [3, 2]);
+
+  // ---- 하루짜리 꾸미기 (자주 나와요) ----
+  add("flower", { name: "꽃 화관", e: "🌸", hat: false, make: ({ head }) => { for (let k = 0; k < 14; k++) { const a = (k / 14) * Math.PI * 2, f = new T.Mesh(new T.SphereGeometry(0.045, 8, 6), M(k % 3 ? "#f7b6c8" : "#fff6e8", 0.6)); f.position.set(Math.sin(a) * 0.3, 0.2, Math.cos(a) * 0.3); head.add(f); if (k % 2) { const l = new T.Mesh(new T.SphereGeometry(0.03, 6, 5), M("#6fae4a", 0.6)); l.scale.set(1.4, 0.4, 0.8); l.position.set(Math.sin(a + 0.2) * 0.31, 0.18, Math.cos(a + 0.2) * 0.31); head.add(l); } } } });
+  add("rainbowscarf", { name: "무지개 목도리", e: "🌈", make: ({ g }) => { ["#e74c3c", "#f39c12", "#f1c40f", "#2ecc71", "#3498db"].forEach((c, i) => { const r = new T.Mesh(new T.TorusGeometry(0.165, 0.028, 6, 20), M(c, 0.9)); r.rotation.x = Math.PI / 2; r.position.y = 0.74 + i * 0.026; g.add(r); }); const t = box(g, 0.1, 0.3, 0.04, M("#3498db", 0.9), 0.09, 0.62, 0.2); t.rotation.z = 0.12; } });
+  add("balloon", { name: "풍선 들기", e: "🎈", hand: true, make: ({ inHand }) => { const b = new T.Group(); cyl(b, 0.003, 0.003, 0.9, M("#ffffff", 0.6), 0, 0.45, 0, 3); const bl = new T.Mesh(new T.SphereGeometry(0.16, 14, 12), M(["#e74c3c", "#3498db", "#f1c40f", "#e84393"][Math.floor(Math.random() * 4)], 0.25)); bl.scale.set(1, 1.18, 1); bl.position.y = 1.0; b.add(bl); inHand(b); return "one"; } });
+  add("sparkle", { name: "반짝이 별 안경", e: "✨", make: ({ head }) => { const gm = M("#f2c84b", 0.25, { metalness: 0.7, emissive: "#b8860b", emissiveIntensity: 0.3 }); for (const sx of [-1, 1]) { const st = new T.Mesh(new T.ExtrudeGeometry(starShape(0.085, 0.04), { depth: 0.015, bevelEnabled: false }), gm); st.position.set(0.1 * sx, 0, 0.29); head.add(st); } box(head, 0.06, 0.014, 0.014, gm, 0, 0.01, 0.3); } });
+  add("earmuff", { name: "털 귀마개", e: "🎧", make: ({ head }) => { const fm = M("#f7d6e0", 0.95); for (const sx of [-1, 1]) { const e = new T.Mesh(new T.SphereGeometry(0.1, 12, 10), fm); e.position.set(0.31 * sx, 0.0, 0); head.add(e); } const band = new T.Mesh(new T.TorusGeometry(0.32, 0.018, 6, 24, Math.PI), M("#d98ca8", 0.6)); band.rotation.y = Math.PI / 2; head.add(band); } });
+  add("ribbon", { name: "큰 리본 머리띠", e: "🎀", make: ({ head }) => { const rm = M("#e84393", 0.6); for (const sx of [-1, 1]) { const w = new T.Mesh(new T.ConeGeometry(0.09, 0.16, 4), rm); w.rotation.z = (Math.PI / 2) * sx; w.position.set(0.09 * sx, 0.33, 0.06); head.add(w); } const k = new T.Mesh(new T.SphereGeometry(0.04, 8, 6), rm); k.position.set(0, 0.33, 0.06); head.add(k); } });
+
+  // ---- ✨ 희귀: 성경 인물 착장 ----
+  const R = (id, o) => add(id, Object.assign({ rare: true }, o));
+  R("joseph", { name: "요셉의 채색옷", who: "요셉", e: "🌈", ref: [1, 37, "창세기 37:3"], make: ({ g }) => { robe(g, null, { map: stripes }); } });
+  R("david", { name: "다윗의 물매와 돌", who: "다윗", e: "🪨", ref: [9, 17, "사무엘상 17:40"], hand: true, make: ({ g, inHand }) => { robe(g, "#c9a978"); const sl = new T.Group(); const st = new T.Mesh(new T.TorusGeometry(0.08, 0.008, 4, 12, Math.PI), M("#7a5230", 0.7)); st.rotation.z = Math.PI; sl.add(st); const p = new T.Mesh(new T.SphereGeometry(0.035, 8, 6), M("#9a9a9a", 0.8)); p.position.y = -0.08; sl.add(p); inHand(sl); const bag = box(g, 0.14, 0.12, 0.06, M("#8a5a2e", 0.8), -0.2, 0.42, 0.22); void bag; for (let k = 0; k < 5; k++) { const s2 = new T.Mesh(new T.SphereGeometry(0.022, 6, 5), M("#b0b0a8", 0.8)); s2.position.set(-0.24 + k * 0.022, 0.49, 0.25); g.add(s2); } return "one"; } });
+  R("moses", { name: "모세의 지팡이와 돌판", who: "모세", e: "📜", ref: [2, 34, "출애굽기 34:29"], hand: true, make: ({ g, inHand }) => { robe(g, "#a0522d"); const sf = staff("#6b4a2a", 1.5); inHand(sf); const tb = new T.Group(); tb.position.set(0, 0.6, 0.3); g.add(tb); for (const sx of [-1, 1]) { const t = box(tb, 0.13, 0.2, 0.03, M("#a9a39a", 0.9), 0.07 * sx, 0, 0); const top = new T.Mesh(new T.CylinderGeometry(0.065, 0.065, 0.03, 12, 1, false, 0, Math.PI), M("#a9a39a", 0.9)); top.rotation.x = Math.PI / 2; top.rotation.z = Math.PI / 2; top.position.set(0.07 * sx, 0.1, 0); tb.add(top); void t; } return "one"; } });
+  R("noah", { name: "노아의 비둘기", who: "노아", e: "🕊", ref: [1, 8, "창세기 8:11"], hand: true, make: ({ inHand, g }) => { robe(g, "#8a7a5a"); const d = new T.Group(); const w = M("#fbfbf7", 0.7); const b = new T.Mesh(new T.SphereGeometry(0.06, 10, 8), w); b.scale.set(0.8, 0.75, 1.3); d.add(b); const hd = new T.Mesh(new T.SphereGeometry(0.035, 8, 6), w); hd.position.set(0, 0.05, 0.06); d.add(hd); const lf = new T.Mesh(new T.SphereGeometry(0.03, 8, 6), M("#5f9e3a", 0.6)); lf.scale.set(0.5, 0.25, 1.4); lf.position.set(0, 0.04, 0.12); d.add(lf); d.position.y = 0.08; inHand(d); return "one"; } });
+  R("miriam", { name: "미리암의 소고", who: "미리암", e: "🪘", ref: [2, 15, "출애굽기 15:20"], hand: true, make: ({ inHand }) => { const t = new T.Group(); t.rotation.x = Math.PI / 2; t.add(new T.Mesh(new T.TorusGeometry(0.11, 0.02, 8, 20), M("#c9893f", 0.5))); t.add(new T.Mesh(new T.CircleGeometry(0.11, 20), M("#f4ead2", 0.8, { side: T.DoubleSide }))); ["#e74c3c", "#f1c40f", "#3498db"].forEach((c, i) => { const r = box(t, 0.02, 0.006, 0.28, M(c, 0.8), -0.05 + i * 0.05, 0, 0.2, { cast: false }); void r; }); t.position.set(0, -0.03, 0.06); inHand(t); return "one"; } });
+  R("ruth", { name: "룻의 보리 이삭", who: "룻", e: "🌾", ref: [8, 2, "룻기 2:17"], hand: true, make: ({ inHand }) => { const b = new T.Group(); for (let k = 0; k < 7; k++) { const st = new T.Group(); st.rotation.z = -0.3 + k * 0.1; b.add(st); cyl(st, 0.004, 0.004, 0.3, M("#c9a64a", 0.8), 0, 0.12, 0, 4); const ear = new T.Mesh(new T.SphereGeometry(0.018, 6, 5), M("#d9b45a", 0.7)); ear.scale.set(0.7, 2.6, 0.7); ear.position.y = 0.3; st.add(ear); } cyl(b, 0.03, 0.03, 0.03, M("#8a5a2e", 0.8), 0, 0.02, 0, 8); inHand(b); return "one"; } });
+  R("esther", { name: "에스더의 왕후 관", who: "에스더", e: "👑", ref: [17, 2, "에스더 2:17"], hat: true, make: ({ head, g }) => { crown(head); cape(g, "#6c3483"); } });
+  R("peter", { name: "베드로의 그물과 물고기", who: "베드로", e: "🐟", ref: [40, 4, "마태복음 4:18"], hand: true, make: ({ g, inHand }) => { const net = new T.Mesh(new T.CylinderGeometry(0.22, 0.3, 0.5, 12, 4, true, Math.PI * 0.7, Math.PI * 0.8), new T.MeshStandardMaterial({ color: "#c8b88a", wireframe: true })); net.position.y = 0.55; g.add(net); const f = new T.Group(); const bd = new T.Mesh(new T.SphereGeometry(0.06, 10, 8), M("#7fa6c0", 0.4, { metalness: 0.3 })); bd.scale.set(0.5, 1, 2); f.add(bd); const tl = new T.Mesh(new T.ConeGeometry(0.05, 0.06, 4), M("#7fa6c0", 0.4)); tl.rotation.x = Math.PI / 2; tl.position.z = -0.14; f.add(tl); f.rotation.x = -1.2; inHand(f); return "one"; } });
+  R("paul", { name: "바울의 편지", who: "바울", e: "✉️", ref: [45, 1, "로마서 1:1"], hand: true, make: ({ g, inHand }) => { robe(g, "#5a6b8a"); const l = new T.Group(); box(l, 0.16, 0.2, 0.01, M("#f4ead2", 0.85), 0, 0, 0); for (let k = 0; k < 5; k++) box(l, 0.12, 0.006, 0.002, M("#7a6a5a", 0.8), 0, 0.06 - k * 0.03, 0.007, { cast: false }); l.rotation.set(0.25, 0, 0.15); l.position.z = 0.07; inHand(l); const bag = box(g, 0.16, 0.16, 0.07, M("#7a5230", 0.8), 0.22, 0.4, 0.06); void bag; const str = new T.Mesh(new T.TorusGeometry(0.28, 0.01, 4, 20, Math.PI), M("#6b4a2a", 0.8)); str.rotation.set(0, 0, -0.6); str.position.set(0.05, 0.62, 0.0); g.add(str); return "one"; } });
+  R("daniel", { name: "다니엘과 사자", who: "다니엘", e: "🦁", ref: [27, 6, "다니엘 6:22"], make: ({ g }) => { robe(g, "#3d6b8a"); } });
+  R("abraham", { name: "아브라함의 별 망토", who: "아브라함", e: "✨", ref: [1, 15, "창세기 15:5"], hand: true, make: ({ g, inHand }) => { cape(g, null, starsTex); inHand(staff("#7a5230", 1.35)); return "one"; } });
+  R("elijah", { name: "엘리야의 겉옷과 까마귀", who: "엘리야", e: "🐦‍⬛", ref: [11, 17, "열왕기상 17:6"], make: ({ g }) => { cape(g, "#6b5a3a"); const rv = new T.Group(); rv.position.set(0.27, 0.9, 0.0); g.add(rv); const bm = M("#1d1d22", 0.4); const b = new T.Mesh(new T.SphereGeometry(0.065, 10, 8), bm); b.scale.set(0.8, 0.75, 1.3); rv.add(b); const hd = new T.Mesh(new T.SphereGeometry(0.04, 8, 6), bm); hd.position.set(0, 0.06, 0.07); rv.add(hd); const bk = new T.Mesh(new T.ConeGeometry(0.014, 0.05, 6), M("#3a3a3a", 0.5)); bk.rotation.x = Math.PI / 2; bk.position.set(0, 0.055, 0.12); rv.add(bk); const br = box(rv, 0.05, 0.03, 0.03, M("#d9b45a", 0.8), 0, 0.045, 0.15); void br; } });
+  R("jonah", { name: "요나의 큰 물고기 모자", who: "요나", e: "🐋", ref: [32, 1, "요나 1:17"], hat: true, make: ({ head }) => { const fm = M("#5f8fb5", 0.5); const f = new T.Group(); f.position.y = 0.2; head.add(f); const b = new T.Mesh(new T.SphereGeometry(0.34, 18, 14, 0, Math.PI * 2, 0, Math.PI * 0.55), fm); f.add(b); const tl = new T.Mesh(new T.ConeGeometry(0.16, 0.24, 4), fm); tl.rotation.x = -Math.PI / 2; tl.scale.set(1.6, 1, 0.3); tl.position.set(0, 0.12, -0.42); f.add(tl); for (const sx of [-1, 1]) { const e = new T.Mesh(new T.SphereGeometry(0.045, 8, 6), M("#ffffff", 0.4)); e.position.set(0.17 * sx, 0.2, 0.22); f.add(e); const p = new T.Mesh(new T.SphereGeometry(0.022, 6, 5), M("#1a1a1a", 0.3)); p.position.set(0.17 * sx, 0.2, 0.26); f.add(p); } const sp = cyl(f, 0.012, 0.03, 0.18, M("#bfe3f5", 0.3, { transparent: true, opacity: 0.8 }), 0, 0.42, -0.1, 6); void sp; } });
+  R("joshua", { name: "여호수아의 나팔", who: "여호수아", e: "📯", ref: [6, 6, "여호수아 6:20"], hand: true, make: ({ inHand }) => { const h = new T.Group(); const hn = new T.Mesh(new T.TorusGeometry(0.14, 0.025, 6, 16, Math.PI * 0.9), M("#d9c39a", 0.6)); h.add(hn); const bell = new T.Mesh(new T.ConeGeometry(0.05, 0.08, 10, 1, true), M("#d9c39a", 0.6, { side: T.DoubleSide })); bell.position.set(0.14, 0.02, 0); bell.rotation.z = -Math.PI / 2; h.add(bell); h.rotation.x = -0.6; inHand(h); return "one"; } });
+  R("samuel", { name: "어린 사무엘의 세마포 에봇", who: "사무엘", e: "🤍", ref: [9, 2, "사무엘상 2:18"], make: ({ g }) => { const v = new T.Mesh(new T.CylinderGeometry(0.205, 0.25, 0.42, 16, 1, true, -Math.PI * 0.42, Math.PI * 0.84), M("#f6f1e4", 0.9, { side: T.DoubleSide })); v.position.y = 0.5; g.add(v); const belt = new T.Mesh(new T.TorusGeometry(0.235, 0.015, 4, 20), M("#c9a64a", 0.6)); belt.rotation.x = Math.PI / 2; belt.position.y = 0.42; g.add(belt); } });
+  R("deborah", { name: "드보라의 종려나무 가지", who: "드보라", e: "🌴", ref: [7, 4, "사사기 4:5"], hand: true, make: ({ inHand }) => { const p = new T.Group(); cyl(p, 0.008, 0.01, 0.55, M("#6b8a3a", 0.7), 0, 0.27, 0, 5); for (let k = 0; k < 9; k++) for (const sx of [-1, 1]) { const lf = new T.Mesh(new T.BoxGeometry(0.16, 0.012, 0.03), M("#4f9a3a", 0.6)); lf.position.set(0.07 * sx, 0.3 + k * 0.03, 0); lf.rotation.z = sx * (0.5 - k * 0.03); p.add(lf); } inHand(p); return "one"; } });
+  R("johnbaptist", { name: "세례 요한의 낙타털 옷", who: "세례 요한", e: "🐫", ref: [40, 3, "마태복음 3:4"], make: ({ g }) => { const fur = M("#a07a4a", 1.0, { side: T.DoubleSide }); const v = new T.Mesh(new T.CylinderGeometry(0.215, 0.29, 0.62, 12, 3, true), fur); v.position.y = 0.42; g.add(v); for (let k = 0; k < 18; k++) { const t = new T.Mesh(new T.SphereGeometry(0.04, 6, 5), fur); const a = k * 0.9; t.position.set(Math.sin(a) * 0.26, 0.2 + (k % 6) * 0.08, Math.cos(a) * 0.26); g.add(t); } const belt = new T.Mesh(new T.TorusGeometry(0.245, 0.02, 4, 20), M("#4a3020", 0.6)); belt.rotation.x = Math.PI / 2; belt.position.y = 0.4; g.add(belt); } });
+  R("nehemiah", { name: "느헤미야의 성벽 돌", who: "느헤미야", e: "🧱", ref: [16, 2, "느헤미야 2:18"], hand: true, make: ({ inHand, g }) => { robe(g, "#7a6a5a"); const b = new T.Group(); box(b, 0.16, 0.09, 0.1, M("#b9a88a", 0.9), 0, 0, 0); box(b, 0.16, 0.09, 0.1, M("#a89878", 0.9), 0.03, 0.095, 0); b.position.z = 0.06; inHand(b); return "one"; } });
+  R("jacob", { name: "야곱의 사닥다리", who: "야곱", e: "🪜", ref: [1, 28, "창세기 28:12"], make: ({ g }) => { const l = new T.Group(); l.position.set(0, 0.75, -0.28); l.rotation.x = 0.15; g.add(l); const wm = M("#b98a5a", 0.7); for (const sx of [-1, 1]) box(l, 0.025, 0.95, 0.025, wm, 0.1 * sx, 0, 0); for (let k = 0; k < 6; k++) box(l, 0.2, 0.02, 0.02, wm, 0, -0.4 + k * 0.16, 0); } });
+  R("rebekah", { name: "리브가의 물 항아리", who: "리브가", e: "🏺", ref: [1, 24, "창세기 24:15"], make: ({ g }) => { const j = new T.Group(); j.position.set(0.25, 1.0, 0); j.rotation.z = -0.3; g.add(j); const jm = M("#c97a4a", 0.7); const b = new T.Mesh(new T.SphereGeometry(0.12, 12, 10), jm); b.scale.y = 1.2; j.add(b); cyl(j, 0.05, 0.07, 0.08, jm, 0, 0.15, 0, 12); } });
+  R("aaron", { name: "아론의 싹 난 지팡이", who: "아론", e: "🌸", ref: [4, 17, "민수기 17:8"], hand: true, make: ({ g, inHand }) => { robe(g, "#3a5a8a"); const sf = staff("#7a5230", 1.35); for (let k = 0; k < 9; k++) { const fl = new T.Mesh(new T.SphereGeometry(0.03, 8, 6), M(k % 3 ? "#fbe3ea" : "#ffffff", 0.6)); fl.position.set(Math.sin(k * 2.1) * 0.04, 0.55 + k * 0.05, Math.cos(k * 2.1) * 0.04); sf.add(fl); const lf = new T.Mesh(new T.SphereGeometry(0.022, 6, 5), M("#6fae4a", 0.6)); lf.scale.set(1.5, 0.4, 0.8); lf.position.set(Math.cos(k * 1.7) * 0.05, 0.57 + k * 0.05, Math.sin(k * 1.7) * 0.05); sf.add(lf); } inHand(sf); return "one"; } });
+  R("lydia", { name: "루디아의 자주 옷감", who: "루디아", e: "🟣", ref: [44, 16, "사도행전 16:14"], make: ({ g }) => { const pm = M("#7b2d8b", 0.6, { side: T.DoubleSide }); const sash = new T.Mesh(new T.TorusGeometry(0.3, 0.06, 6, 24, Math.PI * 1.1), pm); sash.rotation.set(0, Math.PI / 2, 0.75); sash.position.set(0, 0.56, 0); sash.scale.set(1, 1, 0.8); g.add(sash); const roll = cyl(g, 0.05, 0.05, 0.28, pm, -0.27, 0.48, 0.12, 12); roll.rotation.z = Math.PI / 2; } });
+  R("samson", { name: "삼손의 일곱 가닥 머리", who: "삼손", e: "💪", ref: [7, 16, "사사기 16:13"], make: ({ head, look }) => { const hm = M(look.hairColor || "#2b2220", 0.55); for (let k = 0; k < 7; k++) { const a = Math.PI * (0.55 + (k / 6) * 0.9), br = new T.Mesh(new T.CapsuleGeometry(0.03, 0.42, 4, 6), hm); br.position.set(Math.sin(a) * 0.27, -0.26, Math.cos(a) * 0.27); head.add(br); } } });
+  R("gideon", { name: "기드온의 빈 항아리", who: "기드온", e: "🏺", ref: [7, 7, "사사기 7:16"], hand: true, make: ({ inHand, g }) => { robe(g, "#6b7a4a"); const j = new T.Group(); const jm = M("#b5703f", 0.8); const b = new T.Mesh(new T.SphereGeometry(0.08, 12, 10), jm); b.scale.y = 1.2; j.add(b); cyl(j, 0.04, 0.05, 0.05, jm, 0, 0.1, 0, 10); j.position.z = 0.05; inHand(j); return "one"; } });
+  R("shepherd", { name: "베들레헴 목자", who: "목자들", e: "🐑", ref: [42, 2, "누가복음 2:8"], month: 12, hand: true, make: ({ g, head, inHand }) => { robe(g, "#9a8a6a"); const hood = new T.Mesh(new T.SphereGeometry(0.335, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), M("#c9b48a", 0.9, { side: T.DoubleSide })); head.add(hood); const sf = new T.Group(); cyl(sf, 0.018, 0.02, 1.3, M("#7a5230", 0.7), 0, 0.4, 0, 6); const hk = new T.Mesh(new T.TorusGeometry(0.08, 0.018, 5, 12, Math.PI), M("#7a5230", 0.7)); hk.position.set(0.08, 1.05, 0); sf.add(hk); inHand(sf); const lamb = new T.Group(); lamb.position.set(-0.05, 0.62, 0.3); g.add(lamb); const wool = M("#f7f5ee", 1); const b = new T.Mesh(new T.SphereGeometry(0.11, 10, 8), wool); b.scale.set(1.3, 0.9, 0.9); lamb.add(b); const hd = new T.Mesh(new T.SphereGeometry(0.05, 8, 6), M("#3a3330", 0.6)); hd.position.set(0.14, 0.03, 0.02); lamb.add(hd); return "one"; } });
+  R("magi", { name: "동방박사의 예물", who: "동방박사", e: "🎁", ref: [40, 2, "마태복음 2:11"], month: 12, hat: true, hand: true, make: ({ g, head, inHand }) => { cape(g, "#8e44ad"); const tb = new T.Mesh(new T.SphereGeometry(0.35, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.45), M("#f6e7c8", 0.8)); tb.scale.y = 1.25; head.add(tb); const jw = new T.Mesh(new T.SphereGeometry(0.035, 8, 6), M("#c0392b", 0.2)); jw.position.set(0, 0.25, 0.3); head.add(jw); const ch = new T.Group(); box(ch, 0.18, 0.12, 0.12, M("#c99a2e", 0.3, { metalness: 0.7 }), 0, 0, 0); box(ch, 0.19, 0.03, 0.13, M("#8a5a2e", 0.6), 0, 0.07, 0); ch.position.z = 0.07; inHand(ch); return "one"; } });
+  return C;
+})();
+function makeLion() { // 🦁 다니엘과 함께 다니는 사자 (단 6:22 · 하루짜리 착장)
+  const l = makeCat({ name: "사자", base: "#d9a24a", chest: "#f0d49a", size: 2.3, eyes: "#3a2a10", nose: "#4a3020" });
+  const mane = new T.Mesh(new T.TorusGeometry(0.11, 0.06, 8, 16), M("#8a5222", 0.95)); mane.position.set(0, 0, -0.02); l.head.add(mane);
+  const back = new T.Mesh(new T.SphereGeometry(0.12, 10, 8), M("#8a5222", 0.95)); back.position.set(0, 0, -0.05); back.scale.set(1, 1, 0.5); l.head.add(back);
+  return l;
+}
+
 /* ---------------- ✨ 특별 스킨 (미션으로 받아요) ---------------- */
 // 머리 위 새싹(연속 출석) · 베들레헴 별(크리스마스) · 어깨 비둘기(성령강림절) · 치즈 앞치마(쫀득쿠키 10박스) · 백합 배지(부활절)
 const SPROUT_Y = { none: 0.27, santa: 0.5, beanie: 0.43, wheathat: 0.4, antlers: 0.3, scarf: 0.27 };
@@ -288,6 +360,13 @@ function makeStar() {
   const glow = new T.Sprite(new T.SpriteMaterial({ map: makeStar.glowTex, transparent: true, depthWrite: false, opacity: 0.75 })); glow.scale.set(0.55, 0.55, 1); g.add(glow);
   return g;
 }
+function makeRainbow() { // 🌈 언약의 무지개 (창 9:13)
+  const g = new T.Group(), cols = ["#e74c3c", "#f39c12", "#f1c40f", "#2ecc71", "#3498db", "#8e44ad"];
+  cols.forEach((c, i) => { const r = new T.Mesh(new T.TorusGeometry(0.3 - i * 0.035, 0.018, 6, 28, Math.PI), M(c, 0.5, { emissive: c, emissiveIntensity: 0.25 })); g.add(r); });
+  for (const sx of [-1, 1]) { const cl = new T.Mesh(new T.SphereGeometry(0.07, 10, 8), M("#ffffff", 0.9)); cl.scale.set(1.4, 0.8, 1); cl.position.set(0.27 * sx, 0.0, 0); g.add(cl); }
+  g.scale.setScalar(0.9);
+  return g;
+}
 function makeDove() {
   const g = new T.Group(), w = M("#fbfbf7", 0.7), wd = M("#e9e9e2", 0.75);
   const body = new T.Mesh(new T.SphereGeometry(0.07, 12, 10), w); body.scale.set(0.8, 0.75, 1.3); g.add(body);
@@ -304,7 +383,7 @@ function addSpecial(head, g, look) {
   const out = { halo: null, star: false, dove: null };
   if (look.halo !== "none") {
     const star = look.halo === "star";
-    const hg = star ? makeStar() : makeSprout(look.halo === "sprout2" ? 2 : 1, look.halo === "bud");
+    const hg = star ? makeStar() : look.halo === "rainbow" ? makeRainbow() : makeSprout(look.halo === "sprout2" ? 2 : 1, look.halo === "bud");
     hg.position.y = star ? 0.78 : (SPROUT_Y[look.wear] != null ? SPROUT_Y[look.wear] : 0.27);
     if (!star) hg.scale.setScalar(1.35);
     head.add(hg); out.halo = hg; out.star = star; hg.userData.baseY = hg.position.y;
@@ -427,6 +506,13 @@ function addItem(g, armL, armR, item) {
     for (const [x, z, col] of [[-0.04, 0.02, "#d9483b"], [0.035, -0.02, "#e8862f"], [0.0, 0.045, "#c0392b"]]) { const f = new T.Mesh(new T.SphereGeometry(0.035, 10, 8), M(col, 0.5)); f.position.set(x, 0.065, z); b.add(f); }
     for (let k = 0; k < 4; k++) { const st = cyl(b, 0.004, 0.004, 0.16, M("#c99a3a", 0.8), -0.05 + k * 0.03, 0.12, -0.04, 4); st.rotation.z = -0.3 + k * 0.2; const ear = new T.Mesh(new T.SphereGeometry(0.014, 6, 5), M("#d9a93a", 0.7)); ear.scale.set(0.7, 2.2, 0.7); ear.position.set(-0.05 + k * 0.03 + Math.sin(-0.3 + k * 0.2) * -0.08, 0.2, -0.04); b.add(ear); }
     b.position.set(0, -0.06, 0.04); inHand(b); return "one";
+  }
+  if (item === "grapes") { // 🍇 포도송이 (미션 도장 15개 · 요 15:5)
+    const gr = new T.Group(), pm = M("#6c3483", 0.35);
+    let k = 0; for (let row = 0; row < 5; row++) for (let i = 0; i <= 4 - row; i++) { const b = new T.Mesh(new T.SphereGeometry(0.03, 8, 6), pm); b.position.set((i - (4 - row) / 2) * 0.05, -row * 0.045, (k++ % 2) * 0.02); gr.add(b); }
+    const lf = new T.Mesh(new T.SphereGeometry(0.06, 8, 6), M("#4f8f3a", 0.6, { side: T.DoubleSide })); lf.scale.set(1.2, 0.2, 0.9); lf.position.set(0.05, 0.05, 0); gr.add(lf);
+    cyl(gr, 0.006, 0.006, 0.06, M("#6b4a2a", 0.7), 0, 0.05, 0, 5);
+    gr.position.set(0, 0.0, 0.07); inHand(gr); return "one";
   }
   if (item === "mic") {
     const m = new T.Group(); m.rotation.x = -0.9;
@@ -846,7 +932,7 @@ function makeBalloon(col, r = 0.2) {
   const knot = new T.Mesh(new T.ConeGeometry(0.03, 0.05, 6), M(col, 0.4)); knot.position.y = -r * 1.15 - 0.01; knot.rotation.x = Math.PI; b.add(knot);
   return b;
 }
-function buildShowroom(s, seats, obs, clickables, labels) {
+function buildShowroom(s, seats, obs, clickables, labels, doors) {
   const X = SHOW.x, Z = SHOW.z, g = new T.Group(); g.position.set(X, 0, Z); s.add(g);
   const W2 = 3, D2 = 2.2, H = 2.7;
   const cream = M("#fff1cf", 0.85), red = M("#d9483b", 0.55), white = M("#fbfbf7", 0.6), cheese = M("#f7c948", 0.6), cheeseD = M("#e0a92a", 0.7);
@@ -906,12 +992,10 @@ function buildShowroom(s, seats, obs, clickables, labels) {
   }
   // 천장 등 (따뜻한 빛)
   for (const sx of [-1.2, 1.2]) { const lp = new T.Mesh(new T.SphereGeometry(0.14, 12, 10), M("#fff3c4", 0.3, { emissive: "#ffd27a", emissiveIntensity: 0.9 })); lp.position.set(sx, H - 0.35, 0); g.add(lp); cyl(g, 0.01, 0.01, 0.3, M("#333", 0.5), sx, H - 0.15, 0, 4); }
-  g.traverse((m) => (m.userData.action = "showroom")); clickables.push(g);
+  doorMark(g, "showroom"); clickables.push(g); // 집을 누르면 문으로 걸어가서 안으로 들어가요 (2026-11-18)
   obs.push([X - W2 - 0.15, Z - D2 - 0.15, X + W2 + 0.15, Z + D2 + 0.5]);
-  // 안에서 쿠키 만드는 자리 2개 (서 있어요)
-  seats["CM-0"] = { x: X - 1.0, z: Z - 1.75, rot: 0, h: 0.06, stand: true, ax: X - 0.5, az: Z + D2 + 0.75 };
-  seats["CM-1"] = { x: X + 0.7, z: Z - 1.75, rot: 0, h: 0.06, stand: true, ax: X + 0.5, az: Z + D2 + 0.75 };
-  labels.push({ x: X, y: H + 2.55, z: Z, html: "🧀 치즈멜로바이트 쇼룸", action: "showroom" });
+  doors.push({ x: X, z: Z + D2 + 0.85, to: "showroom" });
+  labels.push({ x: X, y: H + 2.55, z: Z, html: "🧀 치즈멜로바이트 쇼룸 · 들어가기", to: "showroom" });
   // 문 앞 마당 (돌 바닥)
   box(s, 8.6, 0.03, 6.2, M("#e8dcc6", 0.95), X, 0.015, Z + D2 + 3.15, { cast: false });
   for (let i = 0; i < 7; i++) { const c = new T.Mesh(new T.CircleGeometry(0.34, 10), M("#d8cdb8", 0.95)); c.rotation.x = -Math.PI / 2; c.position.set(-22.6 - i * 0.62, 0.022, -2.3 - i * 0.12); s.add(c); }
@@ -934,7 +1018,7 @@ function buildShowroom(s, seats, obs, clickables, labels) {
   // 칠판 (가격 · 만든 박스 수) + 포스터 이젤
   const boardMat = new T.MeshBasicMaterial({ map: showBoardTex(null) });
   const bd = new T.Group(); bd.position.set(X - 3.9, 0, Z + D2 + 1.2); bd.rotation.y = 0.35; s.add(bd);
-  const bp = new T.Mesh(new T.PlaneGeometry(1.1, 1.375), boardMat); bp.position.set(0, 0.95, 0.03); bp.rotation.x = -0.12; bd.add(bp);
+  const bp = new T.Mesh(new T.PlaneGeometry(1.1, 1.375), boardMat); bp.position.set(0, 0.93, 0.035); bd.add(bp); // 기울이면 윗부분이 틀 속으로 들어가 잘려 보여서 똑바로 (2026-11-18)
   box(bd, 1.2, 1.48, 0.05, M("#8a5a2e", 0.7), 0, 0.93, 0); box(bd, 0.06, 1.7, 0.06, M("#8a5a2e", 0.7), -0.5, 0.85, -0.25); box(bd, 0.06, 1.7, 0.06, M("#8a5a2e", 0.7), 0.5, 0.85, -0.25);
   bd.traverse((m) => (m.userData.action = "showroom")); clickables.push(bd);
   obs.push([X - 4.6, Z + D2 + 0.6, X - 3.2, Z + D2 + 1.6]);
@@ -1489,6 +1573,68 @@ function adBannerTex() {
     g.fillStyle = "#fff6e0"; g.font = "700 28px Georgia, serif"; g.fillText(AD.url.replace(/^https?:\/\//, "").replace(/\/$/, ""), w / 2, h - 26);
   });
 }
+/* ---------------- ⛸ 그루터기 스케이트장 (산울타리 오른쪽, 2026-11-18) ----------------
+   얼음판 x 35~51 · z -36~-6, 경주 트랙은 타원(가운데 cx, cz · 반지름 a, b). 왼쪽 산울타리 출입구(z -14~-9)로 들어가요 */
+const RINK = { x0: 35, x1: 51, z0: -36, z1: -6, cx: 43, cz: -21, a: 5.4, b: 11.8, gate: [-12.2, -9.4] };
+function rinkLapLen(lane = 0) { const a = RINK.a + lane * 0.7, b = RINK.b + lane * 0.7, hh = ((a - b) ** 2) / ((a + b) ** 2); return Math.PI * (a + b) * (1 + (3 * hh) / (10 + Math.sqrt(4 - 3 * hh))); }
+// 경주 위치: p = 지난 바퀴 수 (0에서 출발, 2면 결승). 출발선은 앞쪽(카메라 쪽) 가운데, 반시계 방향
+function rinkRacePos(p, lane = 0) {
+  const a = RINK.a + lane * 0.7, b = RINK.b + lane * 0.7, th = Math.PI / 2 - p * Math.PI * 2;
+  const x = RINK.cx + a * Math.cos(th), z = RINK.cz + b * Math.sin(th);
+  const dx = a * Math.sin(th), dz = -b * Math.cos(th); // 진행 방향 (th가 줄어드는 쪽)
+  return { x, z, yaw: Math.atan2(dx, dz) };
+}
+function onIce(x, z) { return x > RINK.x0 + 0.35 && x < RINK.x1 - 0.35 && z > RINK.z0 + 0.35 && z < RINK.z1 - 0.35; }
+function buildRink(s, obs, clickables, labels) {
+  const { x0, x1, z0, z1, cx, cz } = RINK, W2 = (x1 - x0) / 2, L2 = (z1 - z0) / 2, R = 3.2;
+  const shape = new T.Shape();
+  shape.moveTo(-W2 + R, -L2); shape.lineTo(W2 - R, -L2); shape.quadraticCurveTo(W2, -L2, W2, -L2 + R); shape.lineTo(W2, L2 - R); shape.quadraticCurveTo(W2, L2, W2 - R, L2);
+  shape.lineTo(-W2 + R, L2); shape.quadraticCurveTo(-W2, L2, -W2, L2 - R); shape.lineTo(-W2, -L2 + R); shape.quadraticCurveTo(-W2, -L2, -W2 + R, -L2);
+  const iceTex = canvasTex(512, 512, (g, w, h) => { g.fillStyle = "#e4f4fb"; g.fillRect(0, 0, w, h); for (let i = 0; i < 160; i++) { g.strokeStyle = `rgba(255,255,255,${0.25 + rnd() * 0.4})`; g.lineWidth = 1 + rnd() * 1.5; g.beginPath(); const x = rnd() * w, y = rnd() * h, a = rnd() * 6; g.moveTo(x, y); g.quadraticCurveTo(x + Math.cos(a) * 40, y + Math.sin(a) * 40, x + Math.cos(a + 0.4) * 90, y + Math.sin(a + 0.4) * 90); g.stroke(); } }, [3, 5]);
+  const ice = new T.Mesh(new T.ShapeGeometry(shape), new T.MeshStandardMaterial({ map: iceTex, roughness: 0.08, metalness: 0.15, color: "#ffffff" }));
+  ice.rotation.x = -Math.PI / 2; ice.position.set(cx, 0.035, cz); ice.receiveShadow = true; s.add(ice);
+  // 경주 트랙 선 (빨강·파랑 타원) + 출발선(체크무늬)
+  for (const [lane, col] of [[-0.5, "#d9483b"], [2.6, "#3a8fd9"]]) {
+    const a = RINK.a + lane * 0.7, b = RINK.b + lane * 0.7, pts = [];
+    for (let i = 0; i <= 96; i++) { const th = (i / 96) * Math.PI * 2; pts.push(new T.Vector2(a * Math.cos(th), b * Math.sin(th))); }
+    const ln = new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts.map((p) => new T.Vector3(p.x, 0, p.y)), true), 96, 0.035, 4, true), M(col, 0.5)); ln.position.set(cx, 0.045, cz); s.add(ln);
+  }
+  const chk = canvasTex(256, 32, (g, w, h) => { for (let i = 0; i < 16; i++) for (let j = 0; j < 2; j++) { g.fillStyle = (i + j) % 2 ? "#222" : "#fff"; g.fillRect(i * 16, j * 16, 16, 16); } });
+  const start = new T.Mesh(new T.PlaneGeometry(2.8, 0.35), new T.MeshBasicMaterial({ map: chk })); start.rotation.x = -Math.PI / 2; start.position.set(cx, 0.05, cz + RINK.b + 1.0); s.add(start);
+  const logo = new T.Mesh(new T.CircleGeometry(1.6, 32), new T.MeshBasicMaterial({ map: textTex([["⛸", 150, 120], ["그루터기", 56, 210]], { w: 300, h: 300, bg: "#cfe9f5", fg: "#3a6f8f" }), transparent: true, opacity: 0.85 })); logo.rotation.x = -Math.PI / 2; logo.position.set(cx, 0.042, cz); s.add(logo);
+  // 둘레 펜스 (흰 벽 + 빨간 손잡이), 왼쪽에 출입구
+  const boardM = M("#fbfbf7", 0.5), railM = M("#d9483b", 0.5), pts = shape.getSpacedPoints(120);
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1], mx = (a.x + b.x) / 2, mz = (a.y + b.y) / 2, X = cx + mx, Z = cz + mz;
+    if (a.x < -W2 + 0.2 && b.x < -W2 + 0.2 && Z > RINK.gate[0] && Z < RINK.gate[1]) continue; // 출입구
+    const len = Math.hypot(b.x - a.x, b.y - a.y) + 0.02, ry = Math.atan2(b.x - a.x, b.y - a.y);
+    box(s, 0.1, 0.85, len, boardM, X, 0.43, Z, { ry }); box(s, 0.16, 0.06, len, railM, X, 0.88, Z, { ry, cast: false });
+    obs.push([X - 0.18, Z - 0.18, X + 0.18, Z + 0.18]);
+  }
+  // 출입구 아치 + 간판
+  const gz = (RINK.gate[0] + RINK.gate[1]) / 2, gx = x0 - 0.1;
+  for (const z of RINK.gate) cyl(s, 0.07, 0.07, 3.0, M("#3a6f8f", 0.5), gx, 1.5, z, 8);
+  const gs = new T.Mesh(new T.PlaneGeometry(3.4, 0.7), new T.MeshBasicMaterial({ map: textTex([["⛸ 그루터기 스케이트장", 46, 54]], { w: 520, h: 108, bg: "#3a6f8f", border: "#cfe9f5" }), side: T.DoubleSide }));
+  gs.position.set(gx, 3.0, gz); gs.rotation.y = -Math.PI / 2; s.add(gs);
+  // 출입구 앞 길 (산울타리 틈 → 얼음판)
+  box(s, x0 - 32.0, 0.03, RINK.gate[1] - RINK.gate[0] + 0.6, M("#d6d2ca", 0.95), (32.0 + x0) / 2, 0.016, gz, { cast: false });
+  // 가로등 4개 + 둘레 전구 줄
+  for (const [x, z] of [[x0 - 0.8, z0 - 0.8], [x1 + 0.8, z0 - 0.8], [x0 - 0.8, z1 + 0.8], [x1 + 0.8, z1 + 0.8]]) { cyl(s, 0.07, 0.09, 4.2, M("#3a3a3a", 0.5), x, 2.1, z, 8); const lp = new T.Mesh(new T.SphereGeometry(0.22, 12, 10), M("#fff3c4", 0.3, { emissive: "#ffe6a0", emissiveIntensity: 1 })); lp.position.set(x, 4.3, z); s.add(lp); obs.push([x - 0.2, z - 0.2, x + 0.2, z + 0.2]); }
+  // 벤치 + 스케이트 신발 선반 (출입구 옆)
+  const bench = (x, z, ry) => { const g = new T.Group(); g.position.set(x, 0, z); g.rotation.y = ry; s.add(g); box(g, 1.8, 0.08, 0.45, M("#8a5a34", 0.7), 0, 0.45, 0); for (const sx of [-0.75, 0.75]) box(g, 0.08, 0.45, 0.4, M("#3a3a3a", 0.5), sx, 0.22, 0); obs.push([x - 0.95, z - 0.35, x + 0.95, z + 0.35]); };
+  bench(33.6, -16.5, Math.PI / 2); bench(33.6, -5.0, Math.PI / 2);
+  const rack = new T.Group(); rack.position.set(33.7, 0, -7.6); s.add(rack);
+  for (const y of [0.2, 0.6, 1.0]) box(rack, 0.45, 0.04, 1.4, M("#c98a46", 0.6), 0, y, 0);
+  for (let k = 0; k < 6; k++) { const sk = new T.Group(); sk.position.set(0, 0.24 + Math.floor(k / 3) * 0.4, -0.45 + (k % 3) * 0.45); rack.add(sk); box(sk, 0.14, 0.12, 0.26, M(k % 2 ? "#fbfbf7" : "#2a2a2a", 0.5), 0, 0.06, 0); box(sk, 0.02, 0.03, 0.32, M("#c0c4c8", 0.2, { metalness: 0.8 }), 0, -0.01, 0); }
+  obs.push([33.3, -8.4, 34.1, -6.8]);
+  // 주변 눈 무더기
+  for (let i = 0; i < 12; i++) { const m = new T.Mesh(new T.SphereGeometry(0.5 + rnd() * 0.5, 10, 8), M("#f6f9fb", 0.95)); m.scale.y = 0.4; m.position.set(i % 2 ? x1 + 1.2 : x0 - 1.4, 0.05, z0 + 2 + i * 2.4); s.add(m); }
+  const clickG = new T.Group(); s.add(clickG); clickG.add(gs); clickG.add(logo);
+  gs.userData.action = "rink"; logo.userData.action = "rink"; clickables.push(gs);
+  labels.push({ x: cx, y: 2.2, z: cz + RINK.b + 1.0, html: "🏁 출발선 · 경주는 얼음 위에서 '🏁 경주 시작'", action: "rink" });
+  labels.push({ x: gx, y: 3.6, z: gz, html: "⛸ 그루터기 스케이트장", action: "rink" });
+}
+
 function buildYard() {
   const s = new T.Scene();
   s.background = new T.Color("#bcdcf2");
@@ -1653,11 +1799,7 @@ function buildYard() {
   }
   // 길 위를 달리는 차들 — 위치를 "지금 시각"으로 계산해서 모두의 화면에서 같은 자리에 보여요 (서버 필요 없음)
   const cars = makeRoadCars(s);
-  // 건너편 집들
-  for (let i = 0; i < 6; i++) {
-    const hx = -30 + i * 12;
-    box(s, 9, 6 + (i % 3), 7, M(["#c9b49a", "#a8b4bf", "#d4c6b0"][i % 3], 0.95), hx, 3 + (i % 3) / 2, 28);
-  }
+  // (2026-11-18) 길 건너편 집들은 없앴어요 — 길 너머가 탁 트여 보여요
   /* ----- 크리스마스 ----- */
   const twk = [];
   let deco = decoBegin(s);
@@ -1777,12 +1919,18 @@ function buildYard() {
   obs.push([HILL.x0 - 0.9, HILL.zBack - 0.3, HILL.x1 + 0.1, HILL.zFoot + 0.15]);
   obs.push([-15.3, -19, 15.3, -3.95]);
   // 오른쪽 끝은 산울타리 (예전 트럭 자리는 없앴어요)
-  for (let z = -43.8; z <= 12.3; z += 0.9) { const b = new T.Mesh(new T.IcosahedronGeometry(0.55, 1), M("#3f7a45", 0.95)); b.position.set(32.6, 0.45, z); b.scale.set(0.8, 0.85, 1); b.castShadow = true; s.add(b); }
-  obs.push([32.0, -45, 34, 13.4]);
+  // 2026-11-18: 산울타리 가운데(z -12.2 ~ -9.4)에 ⛸ 스케이트장 가는 출입구를 뚫었어요. 마당 오른쪽 끝은 x 53.6 산울타리
+  const hedge = (x, z) => { const b = new T.Mesh(new T.IcosahedronGeometry(0.55, 1), M("#3f7a45", 0.95)); b.position.set(x, 0.45, z); b.scale.set(0.8, 0.85, 1); b.castShadow = true; s.add(b); };
+  for (let z = -43.8; z <= 12.3; z += 0.9) if (z < RINK.gate[0] - 0.4 || z > RINK.gate[1] + 0.4) hedge(32.6, z);
+  obs.push([32.0, -45, 34, RINK.gate[0] - 0.3], [32.0, RINK.gate[1] + 0.3, 34, 13.4]);
+  for (let z = -43.8; z <= 12.3; z += 0.9) hedge(53.6, z);
+  for (let x = 33.5; x <= 53; x += 0.9) hedge(x, -43.8);
+  obs.push([53.0, -45, 55, 13.4], [32, -45, 55, -43.2]);
+  buildRink(s, obs, clickables, labels);
   box(s, 12.6, 0.04, 4.6, M("#d6d2ca", 0.95), 26.0, 0.02, 5.0, { cast: false }); // 트럭 앞 보도
   box(s, 2.6, 0.03, 23.5, M("#d6d2ca", 0.95), 19.0, 0.014, -8.6, { cast: false }); // 트럭 옆 → 놀이터 가는 길
   deco = decoBegin(s);
-  const snowFx = makeSnow(s, { x0: -38, x1: 47, z0: -45, z1: 16, h: 14 });
+  const snowFx = makeSnow(s, { x0: -38, x1: 55, z0: -45, z1: 16, h: 14 });
   decoEnd(s, deco, "winter");
   const night = yardNight(s);
 
@@ -1851,7 +1999,7 @@ function buildYard() {
   const FEED_SPOTS = [[CX - 0.95, CZ + 3.05], [CX - 0.32, CZ + 3.1], [CX + 0.32, CZ + 3.1], [CX + 0.95, CZ + 3.05], [CX + 0.0, CZ + 3.75]];
 
   /* ----- 🧀 치즈멜로바이트 쇼룸 (고양이 콘도 왼쪽) + 왼쪽 끝 산울타리 ----- */
-  const showroom = buildShowroom(s, seats, obs, clickables, labels);
+  const showroom = buildShowroom(s, seats, obs, clickables, labels, doors);
   for (let z = -43.8; z <= 12.3; z += 0.9) { const b = new T.Mesh(new T.IcosahedronGeometry(0.55, 1), M("#3f7a45", 0.95)); b.position.set(-36.6, 0.45, z); b.scale.set(0.8, 0.85, 1); b.castShadow = true; s.add(b); }
   obs.push([-38.5, -45, -36.0, 13.4]);
 
@@ -1923,10 +2071,10 @@ function buildYard() {
 
   const courts = buildCourts(s, seats, obs, clickables, labels);
   return { scene: s, seats, obs, clickables, doors, labels, tw: twk, trucks, cats, swings, courts, schedBoard, showroom, sportBoard: courts.sportBoard, initCats, catState: state, feedMat, feedSpot: { x: CX + 2.0, z: CZ + 3.6 },
-    update: (dt, t) => { if (snowOn() && !World.lite) snowFx(dt, t); updateCats(dt, t); updateRoadCars(cars, dt); updateTruckNpcs(trucks, dt, t); showroom.update(t); }, night, bounds: { x0: -36, x1: 33.4, z0: -44.5, z1: 13.3 }, cell: 0.3, pad: 0.24,
+    update: (dt, t) => { if (snowOn() && !World.lite) snowFx(dt, t); updateCats(dt, t); updateRoadCars(cars, dt); updateTruckNpcs(trucks, dt, t); showroom.update(t); }, night, bounds: { x0: -36, x1: 54, z0: -44.5, z1: 13.3 }, cell: 0.3, pad: 0.24,
     cam: { pitch: 0.66, dist: 15, min: 6, max: 26, yawLimit: 1.6 },
-    spawn: { worship: { x: -3, z: -1.6 }, cafe: { x: 9, z: -1.6 }, vision: { x: 2.4, z: -1.7 }, room301: { x: 14.2, z: -1.8 }, praise: { x: -8.6, z: -1.8 }, def: { x: 0, z: 9.5 } },
-    spread: { def: [3.2, 1.6], worship: [1.4, 0.6], cafe: [1.2, 0.6], vision: [0.9, 0.4], room301: [0.8, 0.4], praise: [0.9, 0.35] } };
+    spawn: { worship: { x: -3, z: -1.6 }, cafe: { x: 9, z: -1.6 }, vision: { x: 2.4, z: -1.7 }, room301: { x: 14.2, z: -1.8 }, praise: { x: -8.6, z: -1.8 }, showroom: { x: SHOW.x, z: SHOW.z + 3.6 }, def: { x: 0, z: 9.5 } },
+    spread: { def: [3.2, 1.6], showroom: [1.2, 0.5], worship: [1.4, 0.6], cafe: [1.2, 0.6], vision: [0.9, 0.4], room301: [0.8, 0.4], praise: [0.9, 0.35] } };
 }
 
 /* ===== 본당 (기도하는 공간, 내부) ===== */
@@ -2601,6 +2749,98 @@ function buildRoom301() {
     cam: { pitch: 0.85, dist: 9.5, min: 3.5, max: 15 }, spawn: { def: { x: 2.6, z: HZ - 1.3 } }, spread: { def: [0.9, 0.5] } };
 }
 
+/* ===== 🧀 치즈멜로바이트 쇼룸 (안으로 들어가는 방, 2026-11-18) =====
+   가운데 큰 세모 치즈 모형이 천천히 돌고, 왼쪽·뒤쪽 벽은 진열장(누르면 주문), 오른쪽은 아일랜드 작업대(만들기 게임) */
+function buildShowroomRoom() {
+  const s = new T.Scene();
+  s.background = new T.Color("#3d3330");
+  addLights(s, { sky: "#fff8ec", ground: "#8a6a50", hemi: 0.95, sunI: 0.5, sunPos: [4, 12, 8], ext: 12, amb: 0.2 });
+  const seats = {}, obs = [], clickables = [], doors = [], labels = [];
+  const HX = 6.0, HZ = 5.0, CH = 3.6;
+  const cream = new T.MeshStandardMaterial({ color: "#fff1cf", roughness: 0.95 });
+  const { walls, wallHide, ceil } = roomShell(s, { HX, HZ, CH, floorTex: checkerTex(), back: cream, left: cream, right: cream, front: cream, lights: [] });
+  const red = M("#d9483b", 0.55), wood = M("#c98a46", 0.6), woodD = M("#8a5a2e", 0.7), white = M("#fbfbf7", 0.6), cheese = M("#f7c948", 0.55), cheeseD = M("#e0a92a", 0.7);
+  // 벽 아래 빨간 띠 + 뒷벽 간판
+  for (const [w, x, z, ry] of [[HX * 2, 0, -HZ + 0.02, 0], [HZ * 2, -HX + 0.02, 0, Math.PI / 2], [HZ * 2, HX - 0.02, 0, -Math.PI / 2]]) { const b = box(w === HX * 2 ? walls.back : ry > 0 ? walls.left : walls.right, w, 0.5, 0.02, red, x, 0.25, z, { cast: false }); b.rotation.y = ry; }
+  const sign = new T.Mesh(new T.PlaneGeometry(4.2, 0.88), new T.MeshBasicMaterial({ map: signScriptTex(), transparent: true })); sign.position.set(0, 3.0, -HZ + 0.03); walls.back.add(sign);
+  // 🧀 가운데: 사람보다 훨씬 큰 세모 치즈 모형 (천천히 돌아요)
+  const ped = cyl(s, 1.25, 1.35, 0.45, M("#fbfbf7", 0.5), 0, 0.225, 0, 32); void ped;
+  cyl(s, 1.27, 1.27, 0.06, red, 0, 0.46, 0, 32);
+  const spin = new T.Group(); spin.position.set(0, 0.49, 0); s.add(spin);
+  const tri = new T.Shape(); tri.moveTo(-1.0, 0); tri.lineTo(1.25, 0); tri.lineTo(-1.0, 2.4); tri.closePath();
+  const wedgeGeo = new T.ExtrudeGeometry(tri, { depth: 1.2, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.04, bevelSegments: 2 }); wedgeGeo.translate(-0.1, 0, -0.6);
+  const wedge = new T.Mesh(wedgeGeo, cheese); wedge.castShadow = true; spin.add(wedge);
+  const holeM = M("#d99a16", 0.8);
+  for (const [x, y, r] of [[-0.6, 0.5, 0.18], [-0.3, 1.2, 0.12], [-0.75, 1.7, 0.1], [0.2, 0.35, 0.14], [0.55, 0.25, 0.09], [-0.45, 0.95, 0.07]]) for (const sz of [-1, 1]) {
+    const hh = new T.Mesh(new T.CircleGeometry(r, 16), holeM); hh.position.set(x, y, sz * 0.645); if (sz < 0) hh.rotation.y = Math.PI; spin.add(hh);
+  }
+  const slope = Math.atan2(2.4, 2.25);
+  for (const [f, z, r] of [[0.3, 0.2, 0.16], [0.6, -0.3, 0.12], [0.5, 0.35, 0.08], [0.15, -0.35, 0.1]]) { const hh = new T.Mesh(new T.CircleGeometry(r, 16), holeM); hh.position.set(1.15 - f * 2.25 + 0.03, f * 2.4 + 0.03, z); hh.rotation.set(0, Math.PI / 2, 0); hh.rotateX(-(Math.PI / 2 - slope)); spin.add(hh); }
+  for (let k = 0; k < 10; k++) { const sp = new T.Mesh(new T.OctahedronGeometry(0.05), M("#fff6c8", 0.3, { emissive: "#ffe08a", emissiveIntensity: 0.8 })); sp.position.set(Math.cos(k * 0.63) * 1.6, 0.8 + (k % 4) * 0.5, Math.sin(k * 0.63) * 1.6); spin.add(sp); }
+  spin.traverse((m) => (m.userData.action = "showroom")); clickables.push(spin);
+  obs.push([-1.4, -1.4, 1.4, 1.4]);
+  labels.push({ x: 0, y: 3.35, z: 0, html: "🧀 Cheese Mellow Bites", action: "showroom" });
+  // 🛒 진열장 (왼쪽 벽 · 뒤쪽 벽) — 상자를 누르면 그 크기로 주문서가 열려요
+  const ribbon = M("#ffd54a", 0.5), boxM = M("#c62f26", 0.55);
+  const gift = (parent, x, y, z, w, h, d, act) => {
+    const g = new T.Group(); g.position.set(x, y, z); parent.add(g);
+    box(g, w, h, d, boxM, 0, h / 2, 0); box(g, w + 0.01, h + 0.01, 0.035, ribbon, 0, h / 2, 0, { cast: false }); box(g, 0.035, h + 0.01, d + 0.01, ribbon, 0, h / 2, 0, { cast: false });
+    const bow = new T.Mesh(new T.TorusGeometry(0.035, 0.012, 5, 10), ribbon); bow.position.y = h + 0.02; g.add(bow);
+    g.traverse((m) => (m.userData.action = act)); clickables.push(g); return g;
+  };
+  const shelf = (x, z, ry, len, act, sz, label) => {
+    const sh = new T.Group(); sh.position.set(x, 0, z); sh.rotation.y = ry; s.add(sh);
+    for (const sx of [-len / 2, len / 2]) box(sh, 0.06, 2.3, 0.5, wood, sx, 1.15, 0);
+    box(sh, len, 2.3, 0.04, woodD, 0, 1.15, -0.23);
+    for (const y of [0.3, 0.9, 1.5, 2.1]) box(sh, len, 0.05, 0.5, wood, 0, y, 0);
+    const [w, h] = sz === "l" ? [0.34, 0.2] : [0.24, 0.14];
+    for (const y of [0.33, 0.93, 1.53]) { const n = Math.floor((len - 0.2) / (w + 0.1)); for (let i = 0; i < n; i++) gift(sh, -len / 2 + 0.15 + w / 2 + i * (w + 0.1), y, 0.02, w, h, w * 0.8, act); }
+    const tag = new T.Mesh(new T.PlaneGeometry(len * 0.8, 0.32), new T.MeshBasicMaterial({ map: textTex([[label, 44, 46]], { w: 640, h: 96, bg: "#c62f26", fg: "#fff6e0" }) })); tag.position.set(0, 2.45, 0.05); sh.add(tag);
+    tag.userData.action = act; clickables.push(tag);
+  };
+  shelf(-HX + 0.3, -1.4, Math.PI / 2, 3.2, "buy:s", "s", "🛒 200g · $8 · 눌러서 주문");
+  shelf(-HX + 0.3, 2.3, Math.PI / 2, 2.6, "buy:l", "l", "🛒 450g · $15 · 눌러서 주문");
+  shelf(-2.6, -HZ + 0.3, 0, 3.0, "buy:s", "s", "🛒 200g · $8");
+  shelf(2.6, -HZ + 0.3, 0, 3.0, "buy:l", "l", "🛒 450g · $15");
+  obs.push([-HX, -3.1, -HX + 0.6, 3.7], [-4.2, -HZ, 4.2, -HZ + 0.6]);
+  labels.push({ x: -HX + 0.5, y: 2.95, z: 0.4, html: "🛒 진열장 · 상자를 누르면 주문", action: "buy:s" });
+  // 포스터 (뒷벽 가운데)
+  const pmat = new T.MeshBasicMaterial({ color: "#ffffff" });
+  new T.TextureLoader().load("cheese-mellow-poster.jpg", (tx) => { tx.encoding = T.sRGBEncoding; pmat.map = tx; pmat.needsUpdate = true; });
+  const pp = new T.Mesh(new T.PlaneGeometry(1.25, 1.14), pmat); pp.position.set(0, 1.65, -HZ + 0.04); walls.back.add(pp);
+  box(walls.back, 1.37, 1.26, 0.03, red, 0, 1.65, -HZ + 0.02, { cast: false });
+  // 🧑‍🍳 아일랜드 작업대 (오른쪽) — 여기서 쫀득쿠키를 만들어 봐요
+  const IX = 3.7, IZ = 0.6, isl = new T.Group(); isl.position.set(IX, 0, IZ); s.add(isl);
+  box(isl, 1.2, 0.9, 3.0, white, 0, 0.45, 0); box(isl, 1.35, 0.06, 3.15, M("#e9e2d4", 0.4), 0, 0.93, 0);
+  box(isl, 1.21, 0.12, 3.01, red, 0, 0.82, 0, { cast: false });
+  const pot = cyl(isl, 0.17, 0.15, 0.18, M("#9aa0a6", 0.3, { metalness: 0.6 }), 0, 1.05, -1.0, 16); void pot; cyl(isl, 0.15, 0.15, 0.02, M("#fff8ec", 0.5), 0, 1.13, -1.0, 16);
+  cyl(isl, 0.2, 0.2, 0.02, M("#333", 0.5), 0, 0.97, -1.0, 16);
+  const bowl = new T.Mesh(new T.SphereGeometry(0.2, 16, 10, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), M("#d7dde2", 0.3, { side: T.DoubleSide })); bowl.position.set(0, 1.16, -0.3); isl.add(bowl);
+  cyl(isl, 0.17, 0.17, 0.02, cheese, 0, 1.06, -0.3, 16);
+  box(isl, 0.45, 0.06, 0.35, M("#b0b4b8", 0.3, { metalness: 0.6 }), 0, 0.99, 0.35); box(isl, 0.4, 0.04, 0.3, cheese, 0, 1.03, 0.35);
+  box(isl, 0.5, 0.03, 0.35, M("#c9a06a", 0.6), 0, 0.975, 1.0); for (let k = 0; k < 6; k++) box(isl, 0.06, 0.05, 0.06, cheese, -0.15 + (k % 3) * 0.12, 1.02, 0.92 + Math.floor(k / 3) * 0.12);
+  for (const [z, c] of [[-0.65, "#fffdf5"], [-0.55, "#f29a1a"]]) { const jar = cyl(isl, 0.06, 0.06, 0.16, M("#e6eef2", 0.2, { transparent: true, opacity: 0.6 }), 0.35, 1.04, z, 12); void jar; cyl(isl, 0.055, 0.055, 0.1, M(c, 0.8), 0.35, 1.01, z, 12); }
+  isl.traverse((m) => (m.userData.action = "cookie")); clickables.push(isl);
+  obs.push([IX - 0.7, IZ - 1.6, IX + 0.7, IZ + 1.6]);
+  // 서서 만드는 자리 4개 (작업대 양쪽)
+  [["CM-0", IX - 1.05, IZ - 0.75, Math.PI / 2], ["CM-1", IX - 1.05, IZ + 0.75, Math.PI / 2], ["CM-2", IX + 1.05, IZ - 0.75, -Math.PI / 2], ["CM-3", IX + 1.05, IZ + 0.75, -Math.PI / 2]].forEach(([id, x, z, rot]) => {
+    seats[id] = { x, z, rot, h: 0, stand: true, ax: x + (rot > 0 ? -0.4 : 0.4), az: z };
+  });
+  labels.push({ x: IX, y: 2.2, z: IZ, html: "🧑‍🍳 아일랜드 작업대 · 쫀득쿠키 만들어 보기", action: "cookie" });
+  // 매달린 등 · 풍선
+  for (const [x, z] of [[-2, -2], [2, -2], [-2, 2], [2, 2], [IX, IZ]]) { cyl(s, 0.006, 0.006, 0.7, M("#333", 0.5), x, CH - 0.35, z, 4); const lp = new T.Mesh(new T.ConeGeometry(0.22, 0.22, 16, 1, true), M("#d9483b", 0.5, { side: T.DoubleSide })); lp.position.set(x, CH - 0.8, z); s.add(lp); const bulb = new T.Mesh(new T.SphereGeometry(0.08, 10, 8), M("#fff3c4", 0.3, { emissive: "#ffd27a", emissiveIntensity: 1 })); bulb.position.set(x, CH - 0.88, z); s.add(bulb); }
+  const bl = new T.PointLight("#ffd9a0", 0.6, 12); bl.position.set(0, CH - 0.6, 0); s.add(bl);
+  ["#d9483b", "#ffcf3a", "#fff4dc"].forEach((c, i) => { for (const [x, z] of [[-HX + 0.6, HZ - 0.6], [HX - 0.6, -HZ + 0.6]]) { const b = makeBalloon(c, 0.22); b.position.set(x + (i - 1) * 0.25, 2.4 + (i % 2) * 0.3, z); s.add(b); } });
+  // 문 (앞쪽 벽 왼쪽) → 마당
+  addDoor(walls.front, -3.6, HZ - 0.04, Math.PI, labels, doors, clickables, "#d9483b");
+  doors.push({ x: -3.6, z: HZ - 0.8, to: "yard" });
+  labels.push({ x: -3.6, y: 2.7, z: HZ - 0.2, html: "🚪 마당으로", to: "yard" });
+  return { scene: s, seats, obs, clickables, doors, labels, wallHide, ceil, ceilY: CH,
+    update: (dt) => { spin.rotation.y += dt * 0.35; },
+    bounds: { x0: -HX, x1: HX, z0: -HZ, z1: HZ }, cell: 0.25, pad: 0.22,
+    cam: { pitch: 0.75, dist: 11, min: 4, max: 17 }, spawn: { def: { x: -3.6, z: HZ - 1.3 } }, spread: { def: [1.0, 0.5] } };
+}
+
 /* ===== 🎸 찬양팀 연습실 (리빙리버) ===== */
 // 리빙리버 찬양 음원 (유튜브 플레이리스트 "M/V"). 새 곡이 생기면 여기에 한 줄 넣어요: [유튜브 영상 id, 제목, CD 색]
 const LR_PLAYLIST = "PLF7bMvUfnGHlKEl44DJ0WsCyICkzzTPgZ";
@@ -2615,13 +2855,18 @@ const LR_CDS = [ // 영상 번호는 2026-11-13 유튜브 재생목록·영상 �
 // 연주 자리: 리더 1 · 싱어 5 · 드럼 · 일렉 · 베이스 · 메인 건반 · 세컨 건반
 // inst: lead | sing | drums | key | key2 | egtr | bass
 // 💃 춤 목록 (app.js 춤 고르기 창과 같은 이름)
+// ⛸ 피겨 기술 (이름 · 몇 초 동안)
+const FIGURES = {
+  spin: { name: "🌀 스핀", dur: 2.6 }, axel: { name: "🦘 악셀 점프", dur: 1.8 }, triple: { name: "💫 트리플 악셀", dur: 2.1 },
+  spiral: { name: "🦢 스파이럴", dur: 2.6 }, camel: { name: "🐫 카멜 스핀", dur: 2.6 }, layback: { name: "🙆 레이백 스핀", dur: 2.6 }, bow: { name: "🙇 인사", dur: 1.6 },
+};
 const DANCES = {
   disco: "🕺 디스코", robot: "🤖 로봇 춤", penguin: "🐧 펭귄 뒤뚱", jump: "🦘 신나게 점프", spin: "🌀 빙글빙글",
   praise: "🙌 찬양 율동", wave: "🌊 웨이브", cancan: "🦵 발차기 춤", chicken: "🐔 닭 춤", shuffle: "👟 셔플 스텝",
 };
 // 🌿 마당에서 잔디가 아닌 곳 (보도·길·운동장·놀이터 눈밭): [x0, z0, x1, z1]
 const NOT_GRASS = [[-22, -4.1, 22, -0.7], [-4.3, -2.3, -1.7, 12.3], [8, -2.3, 10, 12.3], [-80, 11.8, 80, 30], [-19.2, -19.6, -16, 6.5], [16.3, -21.6, 19.3, -17.4],
-  [17.7, -20.4, 20.3, 3.2], [19.7, 2.6, 32.4, 7.4], [-34.9, -11.8, -26.3, -1.8], [-24.6, -45, 19.6, -21], [20.1, -43, 32.3, -19.1], [-15.4, -19.2, 15.4, -3.9]];
+  [17.7, -20.4, 20.3, 3.2], [19.7, 2.6, 32.4, 7.4], [-34.9, -11.8, -26.3, -1.8], [32, -37, 52, -5], [-24.6, -45, 19.6, -21], [20.1, -43, 32.3, -19.1], [-15.4, -19.2, 15.4, -3.9]];
 const JAM_SEATS = {
   WL: { x: 0, z: -0.95, rot: 0, inst: "lead", name: "🎤 인도자" },
   "WS-0": { x: -4.4, z: -1.35, rot: 0.25, inst: "sing", name: "🎙 싱어 1" },
@@ -2916,7 +3161,7 @@ const World = {
   getRoom(name) {
     if (!this.rooms[name]) {
       SEASONAL = [];
-      const b = ({ yard: buildYard, worship: buildWorship, cafe: buildCafe, vision: buildVision, room301: buildRoom301, praise: buildPraise }[name] || buildYard)();
+      const b = ({ yard: buildYard, worship: buildWorship, cafe: buildCafe, vision: buildVision, room301: buildRoom301, praise: buildPraise, showroom: buildShowroomRoom }[name] || buildYard)();
       b.grid = new Grid(b.bounds, b.obs, b.cell, b.pad);
       if (b.initCats) b.initCats(b.grid);
       b.labelEls = [];
@@ -2985,11 +3230,11 @@ const World = {
   /* ----- 🐱 따라다니는 고양이 (마당에서만) ----- */
   dropPet(a) { if (a.pet) { a.pet.group.parent && a.pet.group.parent.remove(a.pet.group); a.pet = null; } a.petK = -1; },
   syncPet(a, look) {
-    const k = this.roomName === "yard" ? look.pet : -1;
+    const k = look.costume === "daniel" ? 99 : this.roomName === "yard" ? look.pet : -1; // 99 = 🦁 다니엘의 사자 (어느 방이든)
     if (a.petK === k && (k < 0 || a.pet)) return;
     this.dropPet(a); a.petK = k;
-    if (k < 0 || !CATS[k]) return;
-    const m = makeCat(CATS[k]); m.group.scale.multiplyScalar(0.9);
+    if (k < 0 || (k !== 99 && !CATS[k])) return;
+    const m = k === 99 ? makeLion() : makeCat(CATS[k]); if (k !== 99) m.group.scale.multiplyScalar(0.9);
     m.group.traverse((o) => (o.userData.action = "pet:" + a.id)); this.room.clickables.push(m.group);
     const o = a.outer.position; m.x = o.x - 0.6; m.z = o.z + 0.4; m.yaw = 0; m.petUntil = 0; m.k = k;
     m.group.position.set(m.x, 0, m.z); this.room.scene.add(m.group); a.pet = m;
@@ -3113,7 +3358,9 @@ const World = {
     if (r.showroom.key === n) return; r.showroom.key = n;
     const old = r.showroom.boardMat.map; r.showroom.boardMat.map = showBoardTex(n); r.showroom.boardMat.needsUpdate = true; old && old.dispose();
   },
-  SHOW, AD,
+  SHOW, AD, COSTUMES, RINK, FIGURES, onIce, rinkRacePos, rinkLapLen, raceMe: null,
+  // 경주가 끝나면 내 캐릭터를 그 자리에 세워요
+  placeMe(x, z) { const a = this.me(); if (!a) return; a.pos.x = x; a.pos.z = z; a.path = []; a.goal = { x, z, seat: null }; a.seat = null; },
   CATS,
   canLie(seat) { return !!(this.room && seat && this.room.seats[seat] && this.room.seats[seat].lie); },
   // 그 소파에 나 말고 아무도 없을 때만 누울 수 있어요
@@ -3198,6 +3445,43 @@ const World = {
   jamHit(id, inst) { const a = this.actors.get(id); if (a) { a.jamT = performance.now(); a.jamHits = (a.jamHits || 0) + 1; } },
   /* 💃 춤추기 (찬양팀 연습실): 내 상태 dance = { k: 춤 이름, t0: 시작 시각(Date.now), bpm }
      시작 시각과 빠르기로 계산해서 모두의 화면에서 같은 박자로 춰요 */
+  /* ----- ⛸ 스케이트: 얼음 위에서는 스케이트 날이 생기고, 미끄러지듯 걸어요 · 피겨 기술 ----- */
+  skatePose(a, seated, walking, t, nowMs) {
+    const ice = this.roomName === "yard" && !seated && !a.lyingNow && onIce(a.pos.x, a.pos.z);
+    if (ice && !a.skates) {
+      a.skates = [];
+      for (const L of [a.ch.legL, a.ch.legR]) { const sk = new T.Group(); sk.position.set(0, -0.36, 0.03); L.add(sk); box(sk, 0.14, 0.05, 0.22, M("#fbfbf7", 0.5), 0, 0.0, 0); box(sk, 0.015, 0.05, 0.3, M("#c9d1d8", 0.15, { metalness: 0.9 }), 0, -0.05, 0.01); a.skates.push(sk); }
+    }
+    if (a.skates) for (const sk of a.skates) sk.visible = ice;
+    const g = a.ch.group;
+    if (!ice) { if (a.skating) { a.skating = false; g.rotation.x = 0; g.position.y = 0; } return; }
+    a.skating = true;
+    const fig = a.data && a.data.fig, fe = fig && FIGURES[fig.k] ? (nowMs - fig.t0) / 1000 : 99;
+    if (fe >= 0 && fe < FIGURES[fig && fig.k ? fig.k : "spin"]?.dur) { this.figurePose(a, fig.k, fe, t); return; }
+    g.position.y = 0;
+    if (walking) { // 양발을 번갈아 옆으로 밀며 앞으로 숙여요
+      const ph = Math.sin(t * 5 + a.id.charCodeAt(0));
+      a.ch.legL.rotation.set(0.15, 0, Math.max(0, ph) * 0.45); a.ch.legR.rotation.set(0.15, 0, -Math.max(0, -ph) * 0.45);
+      a.ch.armL.rotation.set(ph * 0.6, 0, 0.35); a.ch.armR.rotation.set(-ph * 0.6, 0, -0.35);
+      g.rotation.x = a.racing ? 0.42 : 0.22;
+    } else g.rotation.x = 0;
+  },
+  figurePose(a, k, e, t) {
+    const g = a.ch.group, F = FIGURES[k], u = e / F.dur, L = a.ch.legL, R = a.ch.legR, AL = a.ch.armL, AR = a.ch.armR;
+    g.rotation.x = 0; g.position.y = 0;
+    const turn = (n, from, to) => { if (e > from && e < to) a.outer.rotation.y += ((n * Math.PI * 2) / (to - from)) * Math.min(0.05, this.clock ? 0.016 : 0.016); };
+    if (k === "spin") { a.outer.rotation.y = a.yaw + e * 9; AL.rotation.set(-3.0, 0, 0.2); AR.rotation.set(-3.0, 0, -0.2); L.rotation.set(0, 0, 0); R.rotation.set(-0.9, 0, 0.3); }
+    else if (k === "camel") { a.outer.rotation.y = a.yaw + e * 7; g.rotation.x = 1.1; R.rotation.set(-1.4, 0, 0); L.rotation.set(0, 0, 0); AL.rotation.set(0, 0, 1.4); AR.rotation.set(0, 0, -1.4); }
+    else if (k === "layback") { a.outer.rotation.y = a.yaw + e * 5; g.rotation.x = -0.55; AL.rotation.set(-2.6, 0, 0.5); AR.rotation.set(-2.6, 0, -0.5); R.rotation.set(-0.6, 0, 0.2); }
+    else if (k === "spiral") { a.outer.rotation.y = a.yaw; g.rotation.x = 0.9 * Math.min(1, e * 2); R.rotation.set(-1.7 * Math.min(1, e * 2), 0, 0); AL.rotation.set(-0.3, 0, 1.3); AR.rotation.set(-0.3, 0, -1.3); g.position.y = 0; }
+    else if (k === "axel" || k === "triple") { // 점프: 뛰어올라 돌고 착지
+      const air = k === "triple" ? 0.9 : 0.7, h = k === "triple" ? 0.85 : 0.6, n = k === "triple" ? 3.5 : 1.5, s0 = 0.35;
+      if (e < s0) { g.rotation.x = 0.3; L.rotation.set(-0.5, 0, 0); R.rotation.set(-0.5, 0, 0); }
+      else if (e < s0 + air) { const q = (e - s0) / air; g.position.y = 4 * h * q * (1 - q); a.outer.rotation.y = a.yaw + q * n * Math.PI * 2; AL.rotation.set(-0.3, 0, -0.2); AR.rotation.set(-0.3, 0, 0.2); L.rotation.set(0, 0, 0.1); R.rotation.set(-0.3, 0, -0.1); }
+      else { a.outer.rotation.y = a.yaw + n * Math.PI * 2; R.rotation.set(-1.1, 0, 0); AL.rotation.set(0, 0, 1.3); AR.rotation.set(0, 0, -1.3); }
+    } else if (k === "bow") { a.outer.rotation.y = a.yaw; g.rotation.x = 0.6 * Math.sin(Math.min(1, u) * Math.PI); AL.rotation.set(0, 0, 0.9); AR.rotation.set(-0.5, 0, -0.2); R.rotation.set(0.3, 0, 0); }
+    void turn; void t;
+  },
   dancePose(a, seated, walking, t) {
     const D = a.data.dance, c = a.ch, on = D && DANCES[D.k] && !seated && !walking && this.roomName === "praise";
     if (!on) {
@@ -3579,14 +3863,25 @@ const World = {
     } else if (me && me.kbWalking) { me.kbWalking = false; me.lastSend = 0; this.hooks.onMove({ x: +me.pos.x.toFixed(2), z: +me.pos.z.toFixed(2) }, null); }
 
     // 사람들 움직이기
+    const nowMs = Date.now();
     for (const a of this.actors.values()) {
       if (a.sledAnim) { this.animSled(a, t); continue; }
-      let walking = !!a.kbWalking;
+      // ⛸ 스피드 스케이팅 경주 중이면 트랙 위 자리로 (나는 raceMe, 친구는 받은 상태로 부드럽게 따라가요)
+      const rs = this.roomName === "yard" ? (a.id === myId ? this.raceMe : a.data && a.data.skr) : null;
+      a.racing = false;
+      if (rs && Number.isFinite(rs.p) && nowMs >= rs.t0 - 6000) {
+        let p = rs.p;
+        if (a.id !== myId) { if (a.raceT0 !== rs.t0) { a.raceT0 = rs.t0; a.raceP = rs.p; } const v = rs.done ? 0 : Math.max(0, (rs.v || 0)) / rinkLapLen(rs.lane || 0); a.raceP += v * dt; a.raceP += (rs.p - a.raceP) * Math.min(1, dt * 3); p = Math.min(2, a.raceP); }
+        const q = rinkRacePos(Math.min(2, p), rs.lane || 0);
+        a.pos.x = q.x; a.pos.z = q.z; a.yaw = q.yaw; a.path = []; a.seat = null; a.goal = { x: q.x, z: q.z, seat: null };
+        a.racing = nowMs >= rs.t0 && !rs.done;
+      }
+      let walking = !!a.kbWalking || a.racing;
       if (a.path.length) {
         const tg = a.path[0], dx = tg.x - a.pos.x, dz = tg.z - a.pos.z, d = Math.hypot(dx, dz);
         // 멀리 갈 때는 뛰어가요 (남은 거리 8m 넘으면 2배 빠르게)
         let left = d; for (let k = 1; k < a.path.length; k++) left += Math.hypot(a.path[k].x - a.path[k - 1].x, a.path[k].z - a.path[k - 1].z);
-        const sp = (left > 8 ? 5 : 2.4) * dt;
+        const sp = (left > 8 ? 5 : 2.4) * (this.roomName === "yard" && onIce(a.pos.x, a.pos.z) ? 1.45 : 1) * dt; // 얼음 위에서는 미끄러지듯 빨라요
         // 안전장치: 다음 걸음이 벽·물건 안이면 (의자에 앉는 마지막 한 걸음은 빼고) 길을 다시 찾거나 멈춰요
         if (!tg.seat && r.grid && r.grid.free(a.pos.x, a.pos.z)) {
           const k = Math.min(1, sp / Math.max(d, 1e-6)), px = a.pos.x + dx * k, pz = a.pos.z + dz * k;
@@ -3644,6 +3939,7 @@ const World = {
       this.sportPose(a, seated, walking, t);
       this.jamPose(a, seated, walking, t);
       this.dancePose(a, seated, walking, t);
+      this.skatePose(a, seated, walking, t, nowMs);
       // ✨ 특별 스킨 움직임: 별은 둥실둥실 돌고, 새싹은 살랑살랑, 비둘기는 고개 까딱
       if (a.ch.halo) { const hb = a.ch.halo; if (a.ch.haloStar) { hb.rotation.y = t * 1.4; hb.position.y = hb.userData.baseY + Math.sin(t * 2.2) * 0.04; } else hb.rotation.z = Math.sin(t * 2.4 + a.id.charCodeAt(0)) * 0.12; }
       if (a.ch.dove) a.ch.dove.rotation.x = Math.sin(t * 3 + 1) * 0.08;
@@ -3764,6 +4060,20 @@ const World = {
     a.ring.visible = false;
     poseCharacter(a.ch, { walking, seated, praying: false }, t * 1.4);
     if (seated && el > CLIMB + TURN) { a.ch.armL.rotation.set(-2.6, 0, 0.3); a.ch.armR.rotation.set(-2.6, 0, -0.3); } // 만세!
+  },
+
+  /* ----- 📸 캐릭터 사진 (올해 카드용, 투명 배경 PNG) ----- */
+  snapshot(look, w = 600, h = 800) {
+    if (!this._snapR) { const cv = document.createElement("canvas"); this._snapR = new T.WebGLRenderer({ canvas: cv, antialias: true, alpha: true, preserveDrawingBuffer: true }); this._snapR.outputEncoding = T.sRGBEncoding; }
+    const r = this._snapR; r.setPixelRatio(1); r.setSize(w, h, false);
+    const sc = new T.Scene(); sc.add(new T.HemisphereLight("#ffffff", "#c8b8a0", 1.05));
+    const dl = new T.DirectionalLight("#ffffff", 0.65); dl.position.set(2, 4, 5); sc.add(dl);
+    const cam = new T.PerspectiveCamera(28, w / h, 0.1, 20); const pal = look.costume === "daniel" || (Number.isInteger(look.pet) && look.pet >= 0); cam.position.set(pal ? 0.9 : 0.6, 1.05, pal ? 5.0 : 4.3); cam.lookAt(pal ? 0.5 : 0, 0.85, 0);
+    const ch = makeCharacter(look); poseCharacter(ch, {}, 0.3); ch.group.rotation.y = 0.22; sc.add(ch.group);
+    if (look.costume === "daniel") { const l = makeLion(); l.group.position.set(1.05, 0, -0.35); l.group.rotation.y = -0.55; catPose(l, false, false, 0, false, 0); sc.add(l.group); }
+    else if (Number.isInteger(look.pet) && look.pet >= 0 && CATS[look.pet]) { const c = makeCat(CATS[look.pet]); c.group.position.set(0.7, 0, 0.3); c.group.rotation.y = -0.5; catPose(c, false, false, 0, false, 0); sc.add(c.group); }
+    r.setClearColor(0x000000, 0); r.render(sc, cam);
+    return r.domElement.toDataURL("image/png");
   },
 
   /* ----- 캐릭터 미리보기 (입장 화면) ----- */

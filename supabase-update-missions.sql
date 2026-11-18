@@ -5,6 +5,8 @@
 --   3) 🛒 치즈멜로바이트 주문 (손님 연락처는 전체 관리자만 봐요)
 --   4) 🔔 주문 알림 (관리자 폰으로)
 --
+--   (2026-11-18 고침: 🎁 오늘의 선물 gift:이름 기록 + 내 기록에 받은 시각 — 이미 실행했어도 다시 실행하면 돼요)
+--
 --  ★ supabase-setup.sql(처음 설정)과 supabase-update-community.sql을 이미 실행한 프로젝트에서,
 --    이 파일 내용을 SQL Editor에 붙여넣고 Run 하면 돼요.
 --    여러 번 실행해도 괜찮아요. 다른 데이터는 그대로 있어요.
@@ -38,15 +40,20 @@ declare
   cap int; cur_n int; cur_at timestamptz; kinds int;
 begin
   if p_token is null or length(p_token) < 8 or length(p_token) > 64 then raise exception '잘못된 요청이에요'; end if;
-  if p_kind is null or p_kind !~ '^(visit|pray|give|catfeed|quiz|jam|cookie|stamp|resolve|read:[0-9]{1,2}:[0-9]{1,3}|season:[a-z]{2,12}:[0-9]{4})$' then
+  if p_kind is null or p_kind !~ '^(visit|pray|give|catfeed|quiz|jam|cookie|stamp|resolve|read:[0-9]{1,2}:[0-9]{1,3}|season:[a-z]{2,12}:[0-9]{4}|gift:[a-z]{2,16})$' then
     raise exception '잘못된 요청이에요';
   end if;
   cap := case
-    when p_kind in ('visit', 'stamp', 'resolve', 'jam') or p_kind like 'read:%' or p_kind like 'season:%' then 1
+    when p_kind in ('visit', 'stamp', 'resolve', 'jam') or p_kind like 'read:%' or p_kind like 'season:%' or p_kind like 'gift:%' then 1
     when p_kind = 'pray' then 20
     else 30 end;
   select count(*) into kinds from mission_log where token = p_token and day = d;
   if kinds > 300 then raise exception '오늘은 기록이 너무 많아요. 내일 다시 해 주세요'; end if;
+  -- 🎁 선물은 하루에 하나만 (미션 도장을 받은 날만)
+  if p_kind like 'gift:%' then
+    if exists (select 1 from mission_log where token = p_token and day = d and kind like 'gift:%') then return 1; end if;
+    if not exists (select 1 from mission_log where token = p_token and day = d and kind = 'stamp') then raise exception '오늘의 미션 3개를 먼저 다 해 주세요'; end if;
+  end if;
   select n, at into cur_n, cur_at from mission_log where token = p_token and day = d and kind = p_kind;
   if found then
     if cur_n >= cap then return cur_n; end if;
@@ -61,13 +68,13 @@ begin
   return 1;
 end; $$;
 
--- 내 기록 한꺼번에: { log: [[날짜, 종류, 횟수], ...], books: [[책, 읽은 장 수, 마지막으로 읽은 때], ...], resolve: "새해 다짐" }
+-- 내 기록 한꺼번에: { log: [[날짜, 종류, 횟수, 마지막 시각(초)], ...], books: [[책, 읽은 장 수, 마지막으로 읽은 때], ...], resolve: "새해 다짐" }
 create or replace function public.mission_me(p_token text)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare lg jsonb; bk jsonb := '[]'::jsonb; rs text;
 begin
   if p_token is null or length(p_token) < 8 or length(p_token) > 64 then raise exception '잘못된 요청이에요'; end if;
-  select coalesce(jsonb_agg(jsonb_build_array(day, kind, n)), '[]'::jsonb) into lg
+  select coalesce(jsonb_agg(jsonb_build_array(day, kind, n, floor(extract(epoch from at)))), '[]'::jsonb) into lg
     from mission_log where token = p_token and day > current_date - 800;
   select note into rs from mission_log where token = p_token and kind = 'resolve' order by day desc limit 1;
   begin -- 통독 기록(supabase-update-community.sql)이 없으면 그냥 빈 목록
