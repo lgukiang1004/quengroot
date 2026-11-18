@@ -6,7 +6,7 @@ const VERSES = window.VERSES || [];
 const BOOKS = window.BOOKS || [];
 const W = window.World;
 // 🔖 world.js가 같이 올라갔는지 확인 (깃허브에 app.js만 올라가고 world.js가 옛날 것이면 지도·뒷마당이 안 바뀌어요)
-const WORLD_VER = "2026-11-18j";
+const WORLD_VER = "2026-11-18k";
 if (!W || W.ver !== WORLD_VER) setTimeout(() => { const b = document.createElement("div"); b.className = "ver-warn"; b.textContent = `⚠️ 사이트 파일이 덜 올라갔어요: world.js가 옛날 버전이에요 (지금 ${W && W.ver ? W.ver : "옛날 것"} · 필요한 것 ${WORLD_VER}). 깃허브에 world.js를 다시 올려 주세요.`; document.body.append(b); }, 1500);
 const LIMIT = { bubble: 80, status: 60, wall: 200, name: 12 };
 // 코드 안의 방 이름: yard = 마당, worship = 본당(기도하는 공간), cafe = 성경 읽는 공간, vision = 비전, room301 = 301호, praise = 찬양팀 연습실(리빙리버)
@@ -2063,6 +2063,7 @@ function onSport(m) {
     const ok = bbApply(m);
     if (ok && m.shot && m.by !== myId && m.shot.make) setTimeout(() => { const me = W.actorPos(myId); if (me && inRect(me, CT.bb.rect, 6)) toast(`🏀 ${clip(m.name, 10) || "친구"}님 ${m.shot.three ? "3점슛!" : "골인!"}`); }, m.shot.dur * 1000);
   }
+  else if (m.k === "skip") { if (m.by !== myId && typeof m.n === "number") { W.skipStone(m.by, +m.x, +m.z, +m.a, Math.max(0, Math.min(14, m.n | 0))); const me = W.actorPos(myId); if (me && Math.hypot(me.x - m.x, me.z - m.z) < 20 && m.n >= 5) toast(`🪨 ${clip(m.name, 8) || "친구"}님 물수제비 ${m.n}번!`); } }
   else if (m.k === "steal") onSteal(m);
   else if (m.k === "stealfail" && m.to === myId) { clearTimeout(SP.stealWait); toast(`🛡 ${clip(m.name, 10) || "친구"}님이 공을 지켰어요! 다시 🤚`); }
   else if (m.k === "serve") onServe(m);
@@ -5535,6 +5536,40 @@ function openPlanView() {
 // 하루 분량을 다 읽으면 미션 기록
 function planTick() { const st = planState(); if (!st) return; const p = st.days[Math.min(st.dayN, st.days.length - 1)]; if (p && st.isDone(p)) mAdd("plan"); renderPlanCard(); }
 setInterval(() => { if (started && S.room === "cafe") planTick(); }, 10e3);
+
+/* ================= 🪨 물수제비 (호숫가에서) ================= */
+// 던지기를 누르면 힘 막대가 오르내려요 → 초록 칸(딱 좋은 힘)에서 놓으면 많이 튀어요. 모두의 화면에 같은 돌이 튀어요.
+const SKIP = { g: null, best: store.get("skipBest", 0), key: "" };
+function lakeNear() { const a = S.room === "yard" && W.actorPos(myId); return !!a && !a.seat && W.lakeShore && W.lakeShore(a.x, a.z); }
+function renderLakeBar() {
+  const bar = $("#lakeBar"); if (!bar) return;
+  const on = lakeNear() || SKIP.g;
+  if (!on) { if (!bar.hidden) bar.hidden = true; SKIP.key = ""; return; }
+  const G = SKIP.g, key = G ? "g" : "i" + SKIP.best;
+  if (key === SKIP.key) { if (G) skipDraw(); return; }
+  SKIP.key = key; bar.hidden = false;
+  if (G) { bar.replaceChildren(h("span", { class: "sb-t", text: "🪨 초록 칸에서 놓아요!" }), h("div", { class: "roast-bar skip-bar" }, h("b", { class: "roast-pin" })), h("button", { class: "btn primary sm", text: "놓기!", onclick: skipRelease })); skipDraw(); return; }
+  bar.replaceChildren(h("span", { class: "sb-t", text: `🪨 물수제비${SKIP.best ? ` · 내 최고 ${SKIP.best}번` : ""}` }), h("button", { class: "btn primary sm", text: "🪨 돌 던지기", onclick: skipStart }));
+}
+function skipP() { if (!SKIP.g) return 0; const e = (Date.now() - SKIP.g.t0) / 1000; const ph = (e * 0.9) % 2; return ph < 1 ? ph : 2 - ph; } // 0→1→0 왕복
+function skipDraw() { const pin = $("#lakeBar .roast-pin"); if (pin) pin.style.left = (skipP() * 100).toFixed(1) + "%"; }
+function skipStart() { if (!lakeNear()) return toast("호숫가에 서서 던져요 🪨"); SKIP.g = { t0: Date.now() }; SKIP.key = ""; renderLakeBar(); }
+function skipRelease() {
+  const p = skipP(); SKIP.g = null; SKIP.key = "";
+  const me = W.actorPos(myId); if (!me) return;
+  // 딱 좋은 힘(0.62~0.78)이면 8~12번, 멀어질수록 적게
+  const d = p < 0.62 ? 0.62 - p : p > 0.78 ? p - 0.78 : 0, base = d === 0 ? 8 + Math.floor(Math.random() * 5) : Math.max(0, Math.round(8 - d * 22 + Math.random() * 2));
+  const ang = Math.atan2(W.LAKE.x - me.x, W.LAKE.z - me.z) + (Math.random() - 0.5) * 0.5;
+  const n = W.skipStone(myId, me.x, me.z, ang, base);
+  api.sendSport({ k: "skip", by: myId, name: myName(), x: +me.x.toFixed(2), z: +me.z.toFixed(2), a: +ang.toFixed(3), n: base });
+  setTimeout(() => {
+    if (n <= 0) toast("🪨 퐁당! 다시 해 봐요 😆");
+    else { const pb = n > SKIP.best; if (pb) { SKIP.best = n; store.set("skipBest", n); } toast(`🪨 ${n}번 튀었어요!${pb ? " 🎉 내 최고 기록!" : ""}`); if (n >= 6) { S.bubble = `🪨 물수제비 ${n}번!`; S.kind = "status"; S.amens = 0; refreshMe(); } }
+    SKIP.key = ""; renderLakeBar();
+  }, 900 + n * 250);
+  renderLakeBar();
+}
+setInterval(() => { if (S.room === "yard" || !$("#lakeBar").hidden) renderLakeBar(); }, 120);
 
 /* ================= 🎶 한밤의 청음회 (2026-11-18 오후) =================
    누구나 예약: 날짜·시간 · 제목 · 설명 · 유튜브 찬양 (30분 안팎). 시간이 겹치면 서버가 막아요.
