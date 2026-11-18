@@ -924,3 +924,13 @@ body.jamming #composer-praise { display: none; }
 .cat-boss { background: #fff4d6; border-radius: 10px; padding: 8px 10px; font-weight: 700; text-align: center; }
 .shelf-item .cnt { display: block; font-size: 11px; color: var(--muted); }
 .shelf-item.empty, .shelf-item:disabled { opacity: .5; }
+.link-big { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; text-align: left; border: 2px solid var(--line); background: #fffdf8; border-radius: 14px; padding: 14px 16px; margin: 8px 0; font: inherit; cursor: pointer; }
+.link-big:hover { border-color: var(--accent); background: #fff6ea; }
+.link-big b { font-size: 16px; }
+.link-big span { font-size: 13px; color: var(--muted); }
+/* 🧑 다른 기기에서 들어왔어요 */
+.away-screen { position: fixed; inset: 0; z-index: 200; background: rgba(30,40,34,.72); display: flex; align-items: center; justify-content: center; backdrop-filter: blur(3px); }
+.away-card { background: #fffdf6; border-radius: 20px; padding: 26px 24px 20px; width: min(340px, calc(100vw - 32px)); text-align: center; box-shadow: 0 16px 40px rgba(0,0,0,.3); }
+.away-e { font-size: 44px; }
+.away-card b { display: block; font-size: 18px; margin: 6px 0; }
+.away-card p { color: var(--muted); font-size: 14px; line-height: 1.55; margin: 0 0 16px; }

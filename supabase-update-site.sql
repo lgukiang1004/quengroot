@@ -19,6 +19,7 @@ create table if not exists public.device_codes (
   token      text        not null,
   created_at timestamptz not null default now()
 );
+alter table public.device_codes add column if not exists used_at timestamptz; -- 다른 기기가 코드를 쓴 때 (만든 기기가 알아채고 새로고침해요)
 create table if not exists public.device_fails (
   token text        not null,
   at    timestamptz not null default now()
@@ -34,7 +35,7 @@ declare v_code text; n int;
 begin
   if p_token is null or length(p_token) < 8 or length(p_token) > 64 then raise exception '잘못된 요청이에요'; end if;
   delete from device_codes where created_at < now() - interval '10 minutes';
-  select count(*) into n from device_codes where token = p_token;
+  select count(*) into n from device_codes where token = p_token and used_at is null;
   if n >= 3 then raise exception '코드를 너무 많이 만들었어요. 10분 뒤에 다시 해 주세요'; end if;
   loop
     v_code := lpad((floor(random() * 900000) + 100000)::int::text, 6, '0');
@@ -77,12 +78,12 @@ begin
   select count(*) into n from device_fails where at > now() - interval '10 minutes';
   if n >= 60 then return jsonb_build_object('error', '지금은 연결이 잠깐 막혀 있어요. 10분 뒤에 다시 해 주세요'); end if;
   delete from device_codes where created_at < now() - interval '10 minutes';
-  select token into v_a from device_codes where code = regexp_replace(coalesce(p_code, ''), '\D', '', 'g');
+  select token into v_a from device_codes where code = regexp_replace(coalesce(p_code, ''), '\D', '', 'g') and used_at is null;
   if v_a is null then
     insert into device_fails (token) values (p_token); -- (오류로 끝내면 이 기록도 취소돼서, 오류 대신 안내를 돌려줘요)
     return jsonb_build_object('error', '코드가 맞지 않거나 10분이 지났어요');
   end if;
-  delete from device_codes where code = regexp_replace(p_code, '\D', '', 'g');
+  update device_codes set used_at = now() where code = regexp_replace(p_code, '\D', '', 'g');
   if v_a = p_token then return jsonb_build_object('token', v_a, 'name', ''); end if;
 
   -- 합치기 전에: 미션 기록은 더 큰 숫자, 스케이트장 기록은 더 좋은 기록을 A에 남겨요
@@ -122,12 +123,55 @@ begin
   return exists (select 1 from mission_log where name = left(trim(p_name), 12) and token <> coalesce(p_token, '') and day > current_date - 90);
 end; $$;
 
+-- 코드를 만든 기기가 3초마다 물어봐요: 'waiting'(기다리는 중) · 'used'(연결됨) · 'gone'(시간 지남)
+create or replace function public.device_code_status(p_code text, p_token text)
+returns text language sql security definer set search_path = public stable as $$
+  select coalesce((select case when used_at is not null then 'used' else 'waiting' end from device_codes where code = p_code and token = p_token), 'gone');
+$$;
+-- 내 통독표 (서버에 있는 체크한 장): 기기를 연결하면 두 기기 통독표가 같아지게 들어올 때마다 받아요
+create or replace function public.reading_me(p_token text)
+returns jsonb language plpgsql security definer set search_path = public stable as $$
+begin
+  if p_token is null or length(p_token) < 8 or length(p_token) > 64 then return '[]'::jsonb; end if;
+  return coalesce((select jsonb_agg(jsonb_build_array(book, chap)) from reading_progress where token = p_token), '[]'::jsonb);
+exception when undefined_table then return '[]'::jsonb;
+end; $$;
+revoke all on function public.device_code_status(text, text) from public;
+revoke all on function public.reading_me(text) from public;
+grant execute on function public.device_code_status(text, text) to anon, authenticated;
+grant execute on function public.reading_me(text) to anon, authenticated;
 revoke all on function public.device_code_make(text) from public;
 revoke all on function public.device_link(text, text) from public;
 revoke all on function public.name_known(text, text) from public;
 grant execute on function public.device_code_make(text) to anon, authenticated;
 grant execute on function public.device_link(text, text) to anon, authenticated;
 grant execute on function public.name_known(text, text) to anon, authenticated;
+
+-- 🧑 캐릭터 · 이름 (기기를 연결하면 마지막으로 바꾼 모습이 모든 기기에 똑같이)
+create table if not exists public.user_profiles (
+  token      text        primary key,
+  profile    jsonb       not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+alter table public.user_profiles enable row level security;
+revoke all on public.user_profiles from anon, authenticated;
+create or replace function public.profile_save(p_token text, p_profile jsonb)
+returns boolean language plpgsql security definer set search_path = public as $$
+begin
+  if p_token is null or length(p_token) < 8 or length(p_token) > 64 then raise exception '잘못된 요청이에요'; end if;
+  if p_profile is null or jsonb_typeof(p_profile) <> 'object' or length(p_profile::text) > 3000 then raise exception '잘못된 요청이에요'; end if;
+  insert into user_profiles (token, profile, updated_at) values (p_token, p_profile, now())
+    on conflict (token) do update set profile = excluded.profile, updated_at = now();
+  return true;
+end; $$;
+create or replace function public.profile_me(p_token text)
+returns jsonb language sql security definer set search_path = public stable as $$
+  select jsonb_build_object('profile', profile, 'at', floor(extract(epoch from updated_at) * 1000)) from user_profiles where token = p_token;
+$$;
+revoke all on function public.profile_save(text, jsonb) from public;
+revoke all on function public.profile_me(text) from public;
+grant execute on function public.profile_save(text, jsonb) to anon, authenticated;
+grant execute on function public.profile_me(text) to anon, authenticated;
 
 -- ---------------------------------------------------------------------
 -- ③ 🧀 주문 연락처 자동 정리: 픽업 완료(done)·취소(canceled)로 바꾼 지 30일이 지나면

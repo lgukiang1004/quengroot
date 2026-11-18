@@ -322,6 +322,9 @@ class DemoBackend {
     setTimeout(() => onList(list.filter((x) => x.room !== info.room).concat(info)), 50);
   }
   lobbyResume() {}
+  lobbyLeave() {}
+  async profileSave() { return true; }
+  async profileMe() { return null; }
   // 🎯 미션 (데모: 이 기기에만 저장 · 화면 쪽 MS가 기록을 들고 있어요)
   async missionAdd() { return 1; }
   async missionMe() { return { log: [], books: [], resolve: null }; }
@@ -332,7 +335,9 @@ class DemoBackend {
   async walkNotes() { return store.get("demo_walk", []); }
   // 📱 기기 연결 (데모: 같은 브라우저 안에서만 흉내)
   async deviceCodeMake() { const code = String(100000 + Math.floor(Math.random() * 900000)); store.set("demo_link", { code, at: Date.now() }); return code; }
-  async deviceLink(code) { const d = store.get("demo_link", null); if (!d || d.code !== code || Date.now() - d.at > 600e3) throw new Error("코드가 맞지 않거나 10분이 지났어요"); return { token, name: S.profile?.name || "" }; }
+  async deviceLink(code) { const d = store.get("demo_link", null); if (!d || d.code !== code || Date.now() - d.at > 600e3 || d.used) return { error: "코드가 맞지 않거나 10분이 지났어요" }; d.used = true; store.set("demo_link", d); return { token, name: S.profile?.name || "" }; }
+  async deviceCodeStatus(code) { const d = store.get("demo_link", null); return !d || d.code !== code || Date.now() - d.at > 600e3 ? "gone" : d.used ? "used" : "waiting"; }
+  async readingMe() { return []; }
   async nameKnown() { return false; }
   async adminSummary() { return { visitors7: 23, today: 6, prayers7: 41, reads7: 88, stamps7: 19, orders_new: 2, orders_week: 5, reports: 1, events_next: 2, members30: 37 }; }
   // ⛸ 스케이트장 랭킹 (데모: 이 기기에만 저장 + 가상 친구들)
@@ -563,7 +568,7 @@ class SupaBackend {
     const { data, error } = await this.sb.rpc(fn, args);
     if (error) {
       // Supabase에 SQL이 아직 적용되지 않았을 때: 알아보기 쉬운 안내로 바꿔요
-      if (/schema cache|does not exist/i.test(error.message)) { console.warn(error.message); throw new Error(`아직 준비 중인 기능이에요. 관리자: Supabase에서 ${/^(walk_note|cat_)/.test(fn) ? "supabase-update-yard.sql" : /^(device_|name_known|admin_summary)/.test(fn) ? "supabase-update-site.sql" : /^(mission_|cookie_|order_|admin_order|push_order|rink_)/.test(fn) ? "supabase-update-missions.sql" : /^(admin_role|admin_set_role_pw|notice_|quiz_set_books|quiz_reset|quiz_submit_g|quiz_ranking_g|challenge_add|challenge_delete|song_save|song_delete|song_clear_set|sheet_)/.test(fn) ? "supabase-update-groups.sql" : /song_rec/.test(fn) ? "supabase-update-praise.sql" : /quiz/.test(fn) ? "supabase-update-quiz.sql" : /setting|event|reading|challenge|testimon|sport|push/.test(fn) ? "supabase-update-community.sql" : "supabase-update-footprints.sql"}을 실행해 주세요`); }
+      if (/schema cache|does not exist/i.test(error.message)) { console.warn(error.message); throw new Error(`아직 준비 중인 기능이에요. 관리자: Supabase에서 ${/^(walk_note|cat_)/.test(fn) ? "supabase-update-yard.sql" : /^(device_|name_known|admin_summary|reading_me|profile_)/.test(fn) ? "supabase-update-site.sql" : /^(mission_|cookie_|order_|admin_order|push_order|rink_)/.test(fn) ? "supabase-update-missions.sql" : /^(admin_role|admin_set_role_pw|notice_|quiz_set_books|quiz_reset|quiz_submit_g|quiz_ranking_g|challenge_add|challenge_delete|song_save|song_delete|song_clear_set|sheet_)/.test(fn) ? "supabase-update-groups.sql" : /song_rec/.test(fn) ? "supabase-update-praise.sql" : /quiz/.test(fn) ? "supabase-update-quiz.sql" : /setting|event|reading|challenge|testimon|sport|push/.test(fn) ? "supabase-update-community.sql" : "supabase-update-footprints.sql"}을 실행해 주세요`); }
       throw new Error(error.message);
     }
     return data;
@@ -702,6 +707,9 @@ class SupaBackend {
   }
   _lobbyReconnect() { const old = this.lob; this.lob = null; if (old) { old.untrack().catch(() => {}); this.sb.removeChannel(old); } this._lobbyConnect(); }
   _lobbyTrack() { if (this.lob && this.lobOk && this.lobbyInfo) this.lob.track(this.lobbyInfo).catch(() => {}); }
+  lobbyLeave() { this.lobbyInfo = null; if (this.lob && this.lobOk) this.lob.untrack().catch(() => {}); }
+  profileSave(pr) { return this._rpc("profile_save", { p_token: token, p_profile: pr }); }
+  profileMe() { return this._rpc("profile_me", { p_token: token }); }
   lobbyResume(hiddenMs) { if (!this.lob) return; if (!this.lobOk || hiddenMs > 15000) { this.lobRetry = 0; this._lobbyReconnect(); } else this._lobbyTrack(); }
   // ---- 🎯 미션 · 🧀 쇼룸 · 🛒 주문 (supabase-update-missions.sql) ----
   missionAdd(kind, note) { return this._rpc("mission_add", { p_token: token, p_name: clip(S.profile?.name, LIMIT.name), p_kind: kind, p_note: note || null }); }
@@ -710,6 +718,8 @@ class SupaBackend {
   walkNotes() { return this._rpc("walk_notes_me", { p_token: token }); }
   deviceCodeMake() { return this._rpc("device_code_make", { p_token: token }); }
   deviceLink(code) { return this._rpc("device_link", { p_code: code, p_token: token }); }
+  deviceCodeStatus(code) { return this._rpc("device_code_status", { p_code: code, p_token: token }); }
+  readingMe() { return this._rpc("reading_me", { p_token: token }); }
   nameKnown(name) { return this._rpc("name_known", { p_name: name, p_token: token }); }
   adminSummary(pw) { return this._rpc("admin_summary", { p_pw: pw }); }
   rinkScoreAdd(kind, score, song) { return this._rpc("rink_score_add", { p_token: token, p_name: clip(S.profile?.name, LIMIT.name) || "", p_kind: kind, p_score: score, p_song: song || "" }); }
@@ -784,6 +794,7 @@ function meState() {
     fpr: S.room === "yard" && typeof SK !== "undefined" && SK.prog && !SK.prog.done ? SK.prog.song.id : null, // 🩰 피겨 연기 중인 곡
     cd: S.room === "praise" ? S.cdShare || null : null,
     amens: S.amens, joinedAt: S.joinedAt,
+    who: S.who || "", act: S.act, // 🧑 같은 사람(연결한 기기)인지 · 이 기기가 '나'가 된 시각 (기기 번호 대신 바꾼 값)
     pos: S.pos, seat: S.seat,
   };
 }
@@ -835,9 +846,10 @@ function renderPeopleCount() { $("#peopleCount").textContent = lobbyAll().length
 let lobbyKey = "";
 function lobbyUpdate() {
   if (!started) return;
-  const me = meState(), info = { id: myId, name: me.name, color: me.color, room: S.room }, key = JSON.stringify(info);
+  if (S.away) return;
+  const me = meState(), info = { id: myId, name: me.name, color: me.color, room: S.room, who: me.who, act: me.act }, key = JSON.stringify(info);
   if (key === lobbyKey) return; lobbyKey = key;
-  api.lobbyJoin(info, (list) => { S.lobby = list.filter((p) => p && typeof p.id === "string" && ROOMS.includes(p.room)); renderPeopleCount(); if (!$("#peoplePop").hidden && !S.giveMode) renderPeopleList(); });
+  api.lobbyJoin(info, (list) => { if (S.away) return; list = list.filter((p) => p && typeof p.id === "string" && ROOMS.includes(p.room)); checkTakeover(list); S.lobby = oneEach(list); renderPeopleCount(); if (!$("#peoplePop").hidden && !S.giveMode) renderPeopleList(); });
 }
 function renderReadingNow(peers) {
   const counts = {};
@@ -907,7 +919,10 @@ function onStatus(st) {
 }
 const roomHandlers = {
   onPeers: (list) => {
-    S.peers = list.filter((p) => p && typeof p.id === "string" && p.id !== myId).concat(meState());
+    if (S.away) return;
+    list = list.filter((p) => p && typeof p.id === "string" && p.id !== myId);
+    checkTakeover(list);
+    S.peers = oneEach(list).filter((p) => !(S.who && p.who === S.who)).concat(meState());
     if (S.room === "yard") bbPeers();
     renderPeople();
     // 처음 들어왔을 때 다른 사람과 같은 자리에 겹쳐 서 있으면 살짝 비켜서요
@@ -2060,7 +2075,16 @@ $("#evAdd").onclick = async () => {
 };
 
 /* ================= 📚 통독 기록 서버 저장 + 함께 통독 챌린지 ================= */
+// 서버에 있는 통독표를 이 기기 통독표에 합쳐요 (기기 연결 뒤에도 두 기기가 같아지게)
+async function pullReading() {
+  if (api.demo) return;
+  let rows = []; try { rows = await api.readingMe(); } catch (e) { return; }
+  let added = 0;
+  for (const [b, c] of rows || []) { const k = String(+b - 1), set = new Set(S.progress[k] || []); if (!set.has(+c)) { set.add(+c); S.progress[k] = [...set].sort((x, y) => x - y); added++; } }
+  if (added) { store.set("progress", S.progress); try { renderProgress(); } catch (e) {} }
+}
 async function syncReading() {
+  await pullReading();
   if (api.demo || store.get("readSync1", false)) return;
   const items = []; for (const [b, l] of Object.entries(S.progress)) for (const c of l) items.push([+b + 1, c]);
   try { if (items.length) await api.readingSync(items.slice(0, 1300)); store.set("readSync1", true); } catch (e) { console.warn("통독 기록 올리기:", e.message); }
@@ -3129,7 +3153,7 @@ $("#resetView").onclick = () => W.resetView();
 let hiddenAt = 0;
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") { hiddenAt = Date.now(); return; }
-  if (!started) return;
+  if (!started || S.away) return;
   api.resume(hiddenAt ? Date.now() - hiddenAt : 0);
   api.lobbyResume(hiddenAt ? Date.now() - hiddenAt : 0);
   hiddenAt = 0;
@@ -5129,6 +5153,64 @@ setInterval(() => {
 renderMeChip();
 setInterval(() => { if (document.visibilityState === "visible" && S.room === "yard") loadCookie(); }, 30e3);
 setInterval(() => { if (started) { missionCheck(); renderMissionBits(); } }, 60e3); // 자정이 지나면 새 미션
+/* ================= 🧑 한 사람 = 한 캐릭터 (기기를 연결하면 2026-11-18) ================= */
+// 같은 사람(같은 기기 번호 token)의 기기 두 개가 동시에 들어오면, 나중에 들어온(지금 쓰는) 기기가 '나'가 되고
+// 먼저 있던 기기는 "📱 다른 기기에서 들어왔어요" 화면으로 바뀌어요. 다른 사람 화면·사람 목록에도 한 명만 보여요.
+// 서로 알아볼 때는 token 대신 바꾼 값(SHA-256 앞 16자리, S.who)만 보내요 (token은 내 기록 열쇠라 보내지 않아요)
+S.act = Date.now(); S.who = "";
+(async () => { try { const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("qpc-who:" + token)); S.who = [...new Uint8Array(b)].slice(0, 8).map((x) => x.toString(16).padStart(2, "0")).join(""); } catch (e) { S.who = "w" + tokHash.toString(16); } if (started) { refreshMe(); lobbyKey = ""; lobbyUpdate(); } })();
+// 같은 사람이면 가장 최근에 '나'가 된 기기 하나만 남겨요
+function oneEach(list) {
+  const best = new Map(), out = [];
+  for (const p of list) { if (!p.who) { out.push(p); continue; } const b = best.get(p.who); if (!b || (p.act || 0) > (b.act || 0)) best.set(p.who, p); }
+  return out.concat([...best.values()]);
+}
+function checkTakeover(list) {
+  if (!S.who || S.away || !started) return;
+  const newer = list.find((p) => p.id !== myId && p.who === S.who && (p.act || 0) > S.act);
+  if (newer) goAway(newer.room);
+}
+function goAway(room) {
+  S.away = true;
+  try { api.leaveRoom(); } catch (e) {} try { api.lobbyLeave(); } catch (e) {}
+  if (typeof SkMusic !== "undefined") SkMusic.stop(true);
+  let el = $("#awayScreen");
+  if (!el) { el = h("div", { id: "awayScreen", class: "away-screen" }); document.body.append(el); }
+  el.replaceChildren(h("div", { class: "away-card" }, h("div", { class: "away-e", text: "📱" }), h("b", { text: "다른 기기에서 들어왔어요" }),
+    h("p", { text: `지금은 다른 기기에서 ${ROOM_NAME[room] || "그루터기"}에 있어요. 한 사람은 한 곳에만 보여요.` }),
+    h("button", { class: "btn primary wide", text: "여기서 계속하기", onclick: comeBack })));
+  el.hidden = false;
+}
+function comeBack() {
+  S.away = false; S.act = Date.now(); $("#awayScreen").hidden = true;
+  lobbyKey = ""; joinRoom(S.room, S.room); lobbyUpdate(); loadMissions(); pullReading(); profilePull();
+  toast("📱 이 기기에서 계속해요");
+}
+// ---- 캐릭터 · 이름도 서버에 (마지막으로 바꾼 모습이 모든 기기에 똑같이) ----
+const PROF_KEYS = ["name", "color", "hair", "hairColor", "glasses", "gender", "item", "wear", "halo", "trail", "shoulder", "apron", "pin", "badge", "title", "pet", "petPick"];
+const profCore = (p) => JSON.stringify(PROF_KEYS.map((k) => (p || {})[k] ?? null));
+let profSent = store.get("profSent", "");
+async function profilePull() {
+  if (api.demo || !S.profile) return;
+  let r = null; try { r = await api.profileMe(); } catch (e) { return; }
+  if (!r || !r.profile) { profilePush(true); return; }
+  const at = Number(r.at) || 0;
+  if (at > (S.profile.upd || 0) && profCore(r.profile) !== profCore(S.profile)) {
+    const np = { ...S.profile }; for (const k of PROF_KEYS) if (k in r.profile) np[k] = r.profile[k];
+    np.upd = at; S.profile = np; store.set("profile", np); profSent = profCore(np); store.set("profSent", profSent);
+    try { Object.assign(draft, np); } catch (e) {}
+    renderMeChip(); refreshMe();
+  }
+}
+async function profilePush(force) {
+  if (api.demo || !S.profile || S.away) return;
+  const core = profCore(S.profile); if (!force && core === profSent) return;
+  if (core !== profSent) { S.profile.upd = Date.now(); store.set("profile", S.profile); }
+  const pr = {}; for (const k of PROF_KEYS) pr[k] = S.profile[k] ?? null;
+  try { await api.profileSave(pr); profSent = core; store.set("profSent", core); } catch (e) { if (!/준비 중/.test(e.message)) console.warn("캐릭터 저장:", e.message); }
+}
+setInterval(() => { if (started) profilePush(); }, 5000);
+
 /* ================= 🧭 사이트 전체 보완 (2026-11-18) ================= */
 // ---- 1) 처음 온 사람 안내 투어 (한 번만, 건너뛸 수 있어요 · 내 캐릭터 → "사용 안내 다시 보기") ----
 const TOUR = [
@@ -5219,19 +5301,47 @@ serverCheck();
 })();
 
 // ---- 5) 📱 기기 연결 코드 ----
-function openLink(intro) {
-  const body = $("#linkBody"); let tmr = null;
-  const codeBox = h("div", { class: "link-code", hidden: true });
-  const mk = h("button", { class: "btn primary", text: "🔢 연결 코드 만들기", onclick: async () => {
-    mk.disabled = true;
-    try {
-      const code = String(await api.deviceCodeMake()), until = Date.now() + 600e3;
-      codeBox.hidden = false; clearInterval(tmr);
-      const draw = () => { const left = Math.max(0, Math.ceil((until - Date.now()) / 1000)); codeBox.replaceChildren(h("b", { text: code.replace(/(\d{3})(\d{3})/, "$1 $2") }), h("small", { text: left ? `다른 기기에서 이 숫자를 넣어 주세요 · ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")} 남음` : "시간이 지났어요. 다시 만들어 주세요" })); if (!left) { clearInterval(tmr); mk.disabled = false; } };
-      draw(); tmr = setInterval(() => { if ($("#linkModal").hidden) clearInterval(tmr); else draw(); }, 1000);
-    } catch (e) { toast("코드를 만들지 못했어요: " + e.message); mk.disabled = false; }
-  } });
+// 화면: 처음엔 큰 버튼 두 개 → 누른 쪽만 보여요
+//  📤 "이 기기 기록을 보내기" = 코드 만들기 (원래 쓰던 기기) → 다른 기기에서 넣으면 이 기기도 저절로 새로고침
+//  📥 "다른 기기 기록 가져오기" = 코드 넣기 (새 기기) → 합친 뒤 새로고침
+let LINKT = null;
+function openLink(intro) { clearInterval(LINKT); renderLink("home", intro); openModal("linkModal"); }
+function renderLink(step, intro) {
+  const body = $("#linkBody"); clearInterval(LINKT);
+  const back = h("button", { class: "btn ghost sm", text: "← 처음으로", onclick: () => renderLink("home") });
+  if (step === "home") {
+    body.replaceChildren(...[
+      intro ? h("p", { class: "link-intro", text: intro }) : null,
+      h("p", { class: "muted", text: "폰과 컴퓨터(또는 아이폰 홈 화면 앱과 사파리)는 기록이 따로 쌓여요. 한 번 연결하면 두 기기가 같은 사람이 되고, 미션·통독·랭킹 기록이 합쳐져요." }),
+      h("button", { class: "link-big", onclick: () => renderLink("send") }, h("b", { text: "📤 이 기기에서 코드 만들기" }), h("span", { text: "기록이 많은, 원래 쓰던 기기에서 눌러요" })),
+      h("button", { class: "link-big", onclick: () => renderLink("get") }, h("b", { text: "📥 다른 기기의 코드 넣기" }), h("span", { text: "새 기기(기록이 없는 쪽)에서 눌러요" })),
+      h("p", { class: "muted tiny", text: "순서: ① 원래 기기에서 📤 → 6자리 숫자가 나와요 ② 새 기기에서 📥 → 그 숫자를 넣어요. 끝나면 두 기기 모두 저절로 새로 불러와요." }),
+      api.demo ? h("p", { class: "muted tiny", text: "데모 모드에서는 같은 브라우저 안에서만 흉내 내요." }) : null].filter(Boolean));
+    return;
+  }
+  if (step === "send") {
+    const box = h("div", { class: "link-code" }, h("small", { text: "코드를 만드는 중…" }));
+    body.replaceChildren(h("div", { class: "link-step" }, h("b", { text: "📤 이 기기에서 코드 만들기" }), box,
+      h("p", { class: "muted tiny", text: "다른 기기에서 📥 '다른 기기의 코드 넣기'를 누르고 이 숫자를 넣어 주세요. 이 창은 열어 두세요 — 연결되면 이 기기도 저절로 새로 불러와요." })),
+      h("p", { class: "muted tiny", text: "🔒 코드는 10분만 쓸 수 있어요. 다른 사람에게 알려 주지 마세요." }), back);
+    (async () => {
+      let code;
+      try { code = String(await api.deviceCodeMake()); } catch (e) { box.replaceChildren(h("small", { text: "코드를 만들지 못했어요: " + e.message })); return; }
+      const until = Date.now() + 600e3;
+      const draw = (msg) => { const left = Math.max(0, Math.ceil((until - Date.now()) / 1000)); box.replaceChildren(h("b", { text: code.replace(/(\d{3})(\d{3})/, "$1 $2") }), h("small", { text: msg || (left ? `다른 기기에서 넣어 주세요 · ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")} 남음` : "시간이 지났어요. ← 처음으로 가서 다시 만들어요") })); return left; };
+      draw(); let n = 0;
+      LINKT = setInterval(async () => {
+        if ($("#linkModal").hidden) { clearInterval(LINKT); return; }
+        if (!draw()) { clearInterval(LINKT); return; }
+        if (++n % 3) return; // 3초마다 연결됐는지 물어봐요
+        try { const st = await api.deviceCodeStatus(code); if (st === "used") { clearInterval(LINKT); draw("✅ 연결됐어요! 합친 기록을 다시 불러올게요"); toast("📱 연결됐어요! 합친 기록을 불러와요"); localStorage.removeItem("oc_mlog"); setTimeout(() => location.reload(), 1600); } } catch (e) {}
+      }, 1000);
+    })();
+    return;
+  }
+  // 📥 코드 넣기
   const inp = h("input", { class: "link-input", inputmode: "numeric", maxlength: 7, placeholder: "123 456", autocomplete: "off" });
+  const warn = h("p", { class: "link-warn", hidden: true, text: "이 기기의 기록이 코드를 만든 기기와 합쳐지고, 앞으로 두 기기는 같은 사람으로 기록돼요. 한 번 더 누르면 연결해요." });
   let armed = false;
   const go = h("button", { class: "btn primary", text: "연결하기", onclick: async () => {
     const code = inp.value.replace(/\D/g, "");
@@ -5243,19 +5353,12 @@ function openLink(intro) {
       if (r && r.error) throw new Error(r.error);
       if (!r || !r.token) throw new Error("연결하지 못했어요");
       store.set("token", r.token); store.set("readSync1", false); localStorage.removeItem("oc_mlog");
-      if (r.name && S.profile && !S.profile.name) { S.profile.name = r.name; store.set("profile", S.profile); }
-      toast("📱 연결됐어요! 기록을 합쳐서 다시 불러올게요"); setTimeout(() => location.reload(), 1500);
-    } catch (e) { toast(e.message); go.disabled = false; armed = false; go.textContent = "연결하기"; }
+      if (S.profile) { S.profile.upd = 0; if (r.name && !S.profile.name) S.profile.name = r.name; store.set("profile", S.profile); } store.set("profSent", ""); // 원래 기기의 캐릭터가 이 기기에도 오게
+      toast("📱 연결됐어요! 합친 기록을 다시 불러올게요"); setTimeout(() => location.reload(), 1500);
+    } catch (e) { toast(e.message); go.disabled = false; armed = false; go.textContent = "연결하기"; warn.hidden = true; }
   } });
-  const warn = h("p", { class: "link-warn", hidden: true, text: "이 기기의 기록이 코드를 만든 기기로 합쳐지고, 앞으로 두 기기는 같은 사람으로 기록돼요. 한 번 더 누르면 연결해요." });
-  body.replaceChildren(...[
-    intro ? h("p", { class: "link-intro", text: intro }) : null,
-    h("p", { class: "muted", text: "폰과 컴퓨터(또는 아이폰 홈 화면 앱과 사파리)를 같이 쓰면 기록이 따로 쌓여요. 한 번 연결하면 미션·통독·랭킹 기록이 합쳐져요." }),
-    h("div", { class: "link-step" }, h("b", { text: "① 원래 쓰던 기기에서" }), h("p", { class: "muted tiny", text: "기록이 많은 기기에서 코드를 만들어요" }), mk, codeBox),
-    h("div", { class: "link-step" }, h("b", { text: "② 새 기기(지금 이 기기)에서" }), h("p", { class: "muted tiny", text: "①에서 나온 6자리 숫자를 넣어요" }), h("div", { class: "link-row" }, inp, go), warn),
-    h("p", { class: "muted tiny", text: "🔒 코드는 10분만 쓸 수 있어요. 다른 사람에게 알려 주지 마세요." }),
-    api.demo ? h("p", { class: "muted tiny", text: "데모 모드에서는 같은 브라우저 안에서만 흉내 내요." }) : null].filter(Boolean));
-  openModal("linkModal");
+  body.replaceChildren(h("div", { class: "link-step" }, h("b", { text: "📥 다른 기기의 코드 넣기" }), h("p", { class: "muted tiny", text: "원래 쓰던 기기에서 📤로 만든 6자리 숫자를 넣어요" }), h("div", { class: "link-row" }, inp, go), warn), back);
+  setTimeout(() => inp.focus(), 50);
 }
 async function linkPromptCheck() {
   if (store.get("linkAsked", false) || api.demo) return;
@@ -5286,7 +5389,7 @@ async function renderAdminSummary(pw) {
   } catch (e) { box.replaceChildren(h("p", { class: "muted tiny", text: "요약을 불러오지 못했어요: " + e.message })); }
 }
 
-if (S.profile) { started = true; joinRoom("yard", "def"); loadMissions().then(() => setTimeout(() => { maybeWelcome(); linkPromptCheck(); }, 1200)); } else { W.setRoom("yard"); $$(".panel").forEach((p) => (p.hidden = p.dataset.room !== "yard")); openEntry(true); }
+if (S.profile) { started = true; joinRoom("yard", "def"); profilePull(); loadMissions().then(() => setTimeout(() => { maybeWelcome(); linkPromptCheck(); }, 1200)); } else { W.setRoom("yard"); $$(".panel").forEach((p) => (p.hidden = p.dataset.room !== "yard")); openEntry(true); }
 loadFootprints();
 
 })();
