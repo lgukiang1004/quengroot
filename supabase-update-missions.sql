@@ -246,3 +246,59 @@ grant execute on function public.order_notify_gate(bigint) to service_role;
 
 -- 바뀐 함수 목록을 Supabase(API)가 바로 다시 읽어 오게 해요
 notify pgrst, 'reload schema';
+
+
+-- =====================================================================
+-- ⛸ 스케이트장 랭킹 (2026-11-18 추가) — 피겨 점수(높을수록) · 스피드 2바퀴 기록(빠를수록)
+--    한 사람(기기 token)당 종류별로 가장 좋은 기록 하나만 남아요. 여러 번 실행해도 안전
+-- =====================================================================
+create table if not exists public.rink_scores (
+  token      text        not null,
+  kind       text        not null check (kind in ('figure', 'speed')),
+  name       text        not null default '',
+  score      numeric(7,2) not null,
+  song       text        not null default '',
+  tries      int         not null default 1,
+  updated_at timestamptz not null default now(),
+  primary key (token, kind)
+);
+create index if not exists rink_scores_kind_idx on public.rink_scores (kind, score);
+alter table public.rink_scores enable row level security;
+revoke all on public.rink_scores from anon, authenticated;
+
+create or replace function public.rink_score_add(p_token text, p_name text, p_kind text, p_score numeric, p_song text default '')
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_old numeric; v_last timestamptz; v_better boolean := true; v_best numeric; v_rank int;
+begin
+  if p_token is null or length(p_token) < 8 or length(p_token) > 64 then raise exception '잘못된 요청이에요'; end if;
+  if p_kind not in ('figure', 'speed') or p_score is null then raise exception '잘못된 요청이에요'; end if;
+  if p_kind = 'figure' and (p_score <= 0 or p_score > 150) then raise exception '점수가 이상해요'; end if;
+  if p_kind = 'speed' and (p_score < 8 or p_score > 600) then raise exception '기록이 이상해요'; end if;
+  select score, updated_at into v_old, v_last from rink_scores where token = p_token and kind = p_kind;
+  if v_last is not null and v_last > now() - interval '8 seconds' then raise exception '조금만 천천히! 🙂'; end if;
+  if v_old is null then
+    insert into rink_scores (token, kind, name, score, song) values (p_token, p_kind, left(coalesce(trim(p_name), ''), 12), round(p_score, 2), left(coalesce(p_song, ''), 16));
+  else
+    v_better := case when p_kind = 'figure' then p_score > v_old else p_score < v_old end;
+    update rink_scores set name = left(coalesce(trim(p_name), ''), 12), tries = tries + 1, updated_at = now(),
+      score = case when v_better then round(p_score, 2) else score end,
+      song  = case when v_better then left(coalesce(p_song, ''), 16) else song end
+      where token = p_token and kind = p_kind;
+  end if;
+  select score into v_best from rink_scores where token = p_token and kind = p_kind;
+  select count(*) + 1 into v_rank from rink_scores where kind = p_kind and (case when p_kind = 'figure' then score > v_best else score < v_best end);
+  return jsonb_build_object('best', v_best, 'rank', v_rank, 'new', v_better);
+end; $$;
+revoke all on function public.rink_score_add(text, text, text, numeric, text) from public;
+grant execute on function public.rink_score_add(text, text, text, numeric, text) to anon, authenticated;
+
+create or replace function public.rink_top(p_kind text, p_token text default '')
+returns table (name text, score numeric, song text, me boolean)
+language sql security definer set search_path = public stable as $$
+  select r.name, r.score, r.song, r.token = coalesce(p_token, '') as me
+    from rink_scores r where r.kind = p_kind
+    order by case when p_kind = 'figure' then -r.score else r.score end, r.updated_at
+    limit 10;
+$$;
+revoke all on function public.rink_top(text, text) from public;
+grant execute on function public.rink_top(text, text) to anon, authenticated;

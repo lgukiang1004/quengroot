@@ -817,3 +817,44 @@ body.jamming #composer-praise { display: none; }
 .skate-bar .sk-foot.hit { transform: scale(.92); filter: brightness(1.2); }
 .sk-prog { flex: 1 1 120px; height: 10px; background: rgba(255,255,255,.25); border-radius: 99px; overflow: hidden; min-width: 100px; }
 .sk-prog i { display: block; height: 100%; background: linear-gradient(90deg, #7fd3ff, #ffffff); }
+
+/* ⛸ 피겨 연기 · 랭킹 · 경주 방법 (2026-11-18) */
+.skate-bar .sk-sep { color: rgba(255,255,255,.7); font-size: 12px; margin-left: 4px; }
+.skate-bar .btn.used { opacity: .55; }
+.sk-beat { width: 16px; height: 16px; border-radius: 50%; background: #ffd54a; box-shadow: 0 0 12px #ffd54a; display: inline-block; flex: 0 0 auto; }
+.sk-fb { min-width: 120px; color: #fff; font-weight: 700; font-size: 13px; opacity: 0; }
+.sk-fb.pop { animation: skfb 1.6s ease-out forwards; }
+.sk-fb.bad { color: #ffb4a8; }
+@keyframes skfb { 0% { opacity: 0; transform: translateY(6px); } 12% { opacity: 1; transform: none; } 75% { opacity: 1; } 100% { opacity: 0; } }
+.fig-rules { background: #eef6fb; border-radius: 12px; padding: 10px 12px; font-size: 13px; margin-bottom: 10px; }
+.fig-rules ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.6; }
+.fig-songs { display: grid; gap: 8px; }
+.fig-song { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; }
+.fig-song .e { font-size: 26px; }
+.fig-song .t { flex: 1; display: flex; flex-direction: column; }
+.fig-song .t small { color: var(--muted); font-size: 12px; }
+.fig-total { text-align: center; margin: 4px 0 12px; }
+.fig-total small { display: block; color: var(--muted); }
+.fig-total b { font-size: 48px; color: #1f4f6e; }
+.fig-total span { font-size: 18px; margin-left: 2px; }
+.fig-row { display: flex; justify-content: space-between; padding: 6px 2px; border-bottom: 1px dashed var(--line); font-size: 14px; }
+.fig-row.bad b { color: #c0392b; }
+.rink-rank { list-style: none; padding: 0; margin: 10px 0; }
+.rink-rank li { display: flex; align-items: center; gap: 10px; padding: 8px 6px; border-bottom: 1px solid var(--line); }
+.rink-rank li.me { background: #fff6dc; border-radius: 8px; }
+.rink-rank .rk { width: 28px; text-align: center; font-weight: 700; }
+.rink-rank .nm { flex: 1; display: flex; flex-direction: column; }
+.rink-rank .nm small { color: var(--muted); font-size: 11.5px; }
+.sk-help { position: fixed; left: 50%; top: 42%; transform: translate(-50%, -50%); z-index: 60; background: rgba(20,52,74,.94); color: #fff; border-radius: 18px; padding: 16px 20px; width: min(92vw, 380px); text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,.3); pointer-events: none; }
+.sk-help b { font-size: 18px; }
+.sk-help p { margin: 6px 0; font-size: 14px; line-height: 1.5; }
+.sk-help .muted { color: #cfe3ee; font-size: 12.5px; }
+.sk-help-feet { display: flex; justify-content: center; align-items: center; gap: 6px; margin: 10px 0 4px; }
+.sk-help-feet span { background: #e8862f; border-radius: 10px; padding: 6px 10px; font-weight: 700; font-size: 14px; }
+.sk-help-feet i { font-style: normal; opacity: .8; }
+.sk-help-n { font-size: 40px; font-weight: 800; color: #ffd54a; min-height: 48px; }
+.rink-seg { display: flex; gap: 6px; background: #f3ece0; border-radius: 12px; padding: 4px; margin-bottom: 6px; }
+.rink-seg button { flex: 1; border: 0; background: transparent; border-radius: 9px; padding: 8px; font: inherit; font-size: 14px; cursor: pointer; color: var(--muted); }
+.rink-seg button.on { background: #fff; color: var(--ink, #2f4a3a); font-weight: 700; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+.fig-song .t { min-width: 0; }
+.fig-song .t b { word-break: keep-all; }

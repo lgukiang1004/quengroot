@@ -1585,7 +1585,30 @@ function rinkRacePos(p, lane = 0) {
   return { x, z, yaw: Math.atan2(dx, dz) };
 }
 function onIce(x, z) { return x > RINK.x0 + 0.35 && x < RINK.x1 - 0.35 && z > RINK.z0 + 0.35 && z < RINK.z1 - 0.35; }
-function buildRink(s, obs, clickables, labels) {
+// 🏆 스케이트장 랭킹판 (피겨 점수 TOP 5 · 스피드 기록 TOP 5)
+function rinkBoardTex(d) {
+  return canvasTex(768, 560, (g, w, h) => {
+    const grd = g.createLinearGradient(0, 0, 0, h); grd.addColorStop(0, "#1d3f5c"); grd.addColorStop(1, "#2a5f7e"); g.fillStyle = grd; g.fillRect(0, 0, w, h);
+    g.strokeStyle = "#cfe9f5"; g.lineWidth = 14; g.strokeRect(7, 7, w - 14, h - 14);
+    g.textAlign = "center"; g.fillStyle = "#ffffff"; g.font = "700 46px 'Gowun Dodum', 'Apple SD Gothic Neo', sans-serif"; g.fillText("🏆 스케이트장 랭킹", w / 2, 70);
+    const col = (x, title, rows, fmt) => {
+      g.textAlign = "left"; g.fillStyle = "#ffd54a"; g.font = "700 32px 'Gowun Dodum', 'Apple SD Gothic Neo', sans-serif"; g.fillText(title, x, 132);
+      g.font = "28px 'Gowun Dodum', 'Apple SD Gothic Neo', sans-serif";
+      if (!rows || !rows.length) { g.fillStyle = "rgba(255,255,255,.7)"; g.fillText(d ? "첫 기록을 남겨요!" : "불러오는 중…", x, 186); return; }
+      rows.slice(0, 5).forEach((r, i) => {
+        const y = 188 + i * 62; g.fillStyle = ["#ffd54a", "#e3e8ee", "#e8a86a", "#cfe9f5", "#cfe9f5"][i];
+        g.font = "700 30px 'Gowun Dodum', 'Apple SD Gothic Neo', sans-serif"; g.fillText(["🥇", "🥈", "🥉", "4", "5"][i], x, y);
+        g.fillStyle = "#ffffff"; g.font = "28px 'Gowun Dodum', 'Apple SD Gothic Neo', sans-serif"; let nm = String(r.name || "익명"); while (nm.length > 1 && g.measureText(nm).width > 150) nm = nm.slice(0, -1); g.fillText(nm, x + 48, y);
+        g.textAlign = "right"; g.fillStyle = "#ffd54a"; g.font = "700 30px 'Gowun Dodum', 'Apple SD Gothic Neo', sans-serif"; g.fillText(fmt(r), x + 320, y); g.textAlign = "left";
+      });
+    };
+    col(42, "🩰 피겨 점수", d && d.figure, (r) => Number(r.score).toFixed(1) + "점");
+    col(410, "🏁 스피드 2바퀴", d && d.speed, (r) => Number(r.score).toFixed(2) + "초");
+    g.strokeStyle = "rgba(255,255,255,.25)"; g.lineWidth = 2; g.beginPath(); g.moveTo(w / 2 + 4, 110); g.lineTo(w / 2 + 4, h - 60); g.stroke();
+    g.textAlign = "center"; g.fillStyle = "#cfe9f5"; g.font = "24px 'Gowun Dodum', 'Apple SD Gothic Neo', sans-serif"; g.fillText("눌러서 전체 랭킹 보기", w / 2, h - 28);
+  });
+}
+function buildRink(s, obs, clickables, labels, seats) {
   const { x0, x1, z0, z1, cx, cz } = RINK, W2 = (x1 - x0) / 2, L2 = (z1 - z0) / 2, R = 3.2;
   const shape = new T.Shape();
   shape.moveTo(-W2 + R, -L2); shape.lineTo(W2 - R, -L2); shape.quadraticCurveTo(W2, -L2, W2, -L2 + R); shape.lineTo(W2, L2 - R); shape.quadraticCurveTo(W2, L2, W2 - R, L2);
@@ -1621,8 +1644,28 @@ function buildRink(s, obs, clickables, labels) {
   // 가로등 4개 + 둘레 전구 줄
   for (const [x, z] of [[x0 - 0.8, z0 - 0.8], [x1 + 0.8, z0 - 0.8], [x0 - 0.8, z1 + 0.8], [x1 + 0.8, z1 + 0.8]]) { cyl(s, 0.07, 0.09, 4.2, M("#3a3a3a", 0.5), x, 2.1, z, 8); const lp = new T.Mesh(new T.SphereGeometry(0.22, 12, 10), M("#fff3c4", 0.3, { emissive: "#ffe6a0", emissiveIntensity: 1 })); lp.position.set(x, 4.3, z); s.add(lp); obs.push([x - 0.2, z - 0.2, x + 0.2, z + 0.2]); }
   // 벤치 + 스케이트 신발 선반 (출입구 옆)
-  const bench = (x, z, ry) => { const g = new T.Group(); g.position.set(x, 0, z); g.rotation.y = ry; s.add(g); box(g, 1.8, 0.08, 0.45, M("#8a5a34", 0.7), 0, 0.45, 0); for (const sx of [-0.75, 0.75]) box(g, 0.08, 0.45, 0.4, M("#3a3a3a", 0.5), sx, 0.22, 0); obs.push([x - 0.95, z - 0.35, x + 0.95, z + 0.35]); };
-  bench(33.6, -16.5, Math.PI / 2); bench(33.6, -5.0, Math.PI / 2);
+  // 구경 벤치 (앉을 수 있어요, 자리 RB{번}-{0|1}). 얼음판 쪽(+x)을 봐요
+  const bench = (x, z, ry, b) => {
+    const g = new T.Group(); g.position.set(x, 0, z); g.rotation.y = ry; s.add(g);
+    box(g, 1.8, 0.08, 0.45, M("#8a5a34", 0.7), 0, 0.45, 0); box(g, 1.8, 0.32, 0.06, M("#8a5a34", 0.7), 0, 0.72, -0.22);
+    for (const sx of [-0.75, 0.75]) box(g, 0.08, 0.45, 0.4, M("#3a3a3a", 0.5), sx, 0.22, 0);
+    const ids = [];
+    for (const k of [-0.42, 0.42]) { const id = `RB${b}-${k < 0 ? 0 : 1}`, c = Math.cos(ry), sn = Math.sin(ry), sx = x + k * c, sz = z - k * sn; seats[id] = { x: sx, z: sz, rot: ry, h: 0.47, ax: sx + Math.sin(ry) * 0.75, az: sz + Math.cos(ry) * 0.75, rink: true }; ids.push(id); }
+    seatGroupMark(g, ids); clickables.push(g);
+    const hw = Math.abs(Math.cos(ry)) * 0.95 + Math.abs(Math.sin(ry)) * 0.3, hd = Math.abs(Math.sin(ry)) * 0.95 + Math.abs(Math.cos(ry)) * 0.3;
+    obs.push([x - hw, z - hd, x + hw, z + hd]);
+  };
+  bench(33.6, -16.5, Math.PI / 2, 0); bench(33.6, -5.0, Math.PI / 2, 1); bench(33.6, -24.5, Math.PI / 2, 2); bench(52.7, -21, -Math.PI / 2, 3);
+  // 🙌 펜스에 기대어 구경하는 자리 (자리 RL-{번}, 서서 팔을 펜스에 올려요). 펜스를 누르면 그 자리로 가요
+  const leanM = new T.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
+  const leans = [[x0 - 0.5, -30, Math.PI / 2], [x0 - 0.5, -27.5, Math.PI / 2], [x0 - 0.5, -21, Math.PI / 2], [x0 - 0.5, -19, Math.PI / 2],
+    [39.5, z1 + 0.5, Math.PI], [42, z1 + 0.5, Math.PI], [44.5, z1 + 0.5, Math.PI], [47, z1 + 0.5, Math.PI],
+    [x1 + 0.5, -29, -Math.PI / 2], [x1 + 0.5, -25, -Math.PI / 2], [x1 + 0.5, -17, -Math.PI / 2], [x1 + 0.5, -13, -Math.PI / 2]];
+  leans.forEach(([x, z, rot], i) => {
+    const id = "RL-" + i; seats[id] = { x, z, rot, h: 0, stand: true, lean: true, ax: x - Math.sin(rot) * 0.6, az: z - Math.cos(rot) * 0.6, rink: true };
+    const hit = new T.Mesh(new T.BoxGeometry(1.3, 1.1, 0.5), leanM); hit.position.set(x + Math.sin(rot) * 0.45, 0.55, z + Math.cos(rot) * 0.45); hit.rotation.y = rot; s.add(hit);
+    seatGroupMark(hit, [id]); clickables.push(hit);
+  });
   const rack = new T.Group(); rack.position.set(33.7, 0, -7.6); s.add(rack);
   for (const y of [0.2, 0.6, 1.0]) box(rack, 0.45, 0.04, 1.4, M("#c98a46", 0.6), 0, y, 0);
   for (let k = 0; k < 6; k++) { const sk = new T.Group(); sk.position.set(0, 0.24 + Math.floor(k / 3) * 0.4, -0.45 + (k % 3) * 0.45); rack.add(sk); box(sk, 0.14, 0.12, 0.26, M(k % 2 ? "#fbfbf7" : "#2a2a2a", 0.5), 0, 0.06, 0); box(sk, 0.02, 0.03, 0.32, M("#c0c4c8", 0.2, { metalness: 0.8 }), 0, -0.01, 0); }
@@ -1633,6 +1676,16 @@ function buildRink(s, obs, clickables, labels) {
   gs.userData.action = "rink"; logo.userData.action = "rink"; clickables.push(gs);
   labels.push({ x: cx, y: 2.2, z: cz + RINK.b + 1.0, html: "🏁 출발선 · 경주는 얼음 위에서 '🏁 경주 시작'", action: "rink" });
   labels.push({ x: gx, y: 3.6, z: gz, html: "⛸ 그루터기 스케이트장", action: "rink" });
+  // 🏆 랭킹판 (얼음판 앞 왼쪽, 출입구 옆) — 누르면 전체 랭킹
+  const rb = new T.Group(); rb.position.set(37.6, 0, -3.6); s.add(rb);
+  for (const sx of [-1.75, 1.75]) cyl(rb, 0.07, 0.07, 3.3, M("#3a6f8f", 0.5), sx, 1.65, 0, 8);
+  box(rb, 3.7, 2.7, 0.1, M("#cfe9f5", 0.5), 0, 1.95, -0.05);
+  const boardMat = new T.MeshBasicMaterial({ map: rinkBoardTex(null) });
+  const bm = new T.Mesh(new T.PlaneGeometry(3.5, 2.55), boardMat); bm.position.set(0, 1.95, 0.01); rb.add(bm);
+  rb.traverse((m) => (m.userData.action = "rinkrank")); clickables.push(rb);
+  obs.push([37.6 - 1.9, -3.9, 37.6 + 1.9, -3.3]);
+  labels.push({ x: 37.6, y: 3.6, z: -3.6, html: "🏆 스케이트장 랭킹", action: "rinkrank" });
+  return { boardMat };
 }
 
 function buildYard() {
@@ -1926,7 +1979,7 @@ function buildYard() {
   for (let z = -43.8; z <= 12.3; z += 0.9) hedge(53.6, z);
   for (let x = 33.5; x <= 53; x += 0.9) hedge(x, -43.8);
   obs.push([53.0, -45, 55, 13.4], [32, -45, 55, -43.2]);
-  buildRink(s, obs, clickables, labels);
+  const rink = buildRink(s, obs, clickables, labels, seats);
   box(s, 12.6, 0.04, 4.6, M("#d6d2ca", 0.95), 26.0, 0.02, 5.0, { cast: false }); // 트럭 앞 보도
   box(s, 2.6, 0.03, 23.5, M("#d6d2ca", 0.95), 19.0, 0.014, -8.6, { cast: false }); // 트럭 옆 → 놀이터 가는 길
   deco = decoBegin(s);
@@ -2070,7 +2123,7 @@ function buildYard() {
   const initCats = (grid) => { catGrid = grid; pts = catPts.filter(([x, z]) => grid.free(x, z)); };
 
   const courts = buildCourts(s, seats, obs, clickables, labels);
-  return { scene: s, seats, obs, clickables, doors, labels, tw: twk, trucks, cats, swings, courts, schedBoard, showroom, sportBoard: courts.sportBoard, initCats, catState: state, feedMat, feedSpot: { x: CX + 2.0, z: CZ + 3.6 },
+  return { scene: s, seats, obs, clickables, doors, labels, tw: twk, trucks, cats, swings, courts, schedBoard, showroom, rink, sportBoard: courts.sportBoard, initCats, catState: state, feedMat, feedSpot: { x: CX + 2.0, z: CZ + 3.6 },
     update: (dt, t) => { if (snowOn() && !World.lite) snowFx(dt, t); updateCats(dt, t); updateRoadCars(cars, dt); updateTruckNpcs(trucks, dt, t); showroom.update(t); }, night, bounds: { x0: -36, x1: 54, z0: -44.5, z1: 13.3 }, cell: 0.3, pad: 0.24,
     cam: { pitch: 0.66, dist: 15, min: 6, max: 26, yawLimit: 1.6 },
     spawn: { worship: { x: -3, z: -1.6 }, cafe: { x: 9, z: -1.6 }, vision: { x: 2.4, z: -1.7 }, room301: { x: 14.2, z: -1.8 }, praise: { x: -8.6, z: -1.8 }, showroom: { x: SHOW.x, z: SHOW.z + 3.6 }, def: { x: 0, z: 9.5 } },
@@ -2859,6 +2912,7 @@ const LR_CDS = [ // 영상 번호는 2026-11-13 유튜브 재생목록·영상 �
 const FIGURES = {
   spin: { name: "🌀 스핀", dur: 2.6 }, axel: { name: "🦘 악셀 점프", dur: 1.8 }, triple: { name: "💫 트리플 악셀", dur: 2.1 },
   spiral: { name: "🦢 스파이럴", dur: 2.6 }, camel: { name: "🐫 카멜 스핀", dur: 2.6 }, layback: { name: "🙆 레이백 스핀", dur: 2.6 }, bow: { name: "🙇 인사", dur: 1.6 },
+  fall: { name: "😵 엉덩방아", dur: 2.4, hide: true }, // 트리플 악셀 실패 (버튼에는 안 보여요)
 };
 const DANCES = {
   disco: "🕺 디스코", robot: "🤖 로봇 춤", penguin: "🐧 펭귄 뒤뚱", jump: "🦘 신나게 점프", spin: "🌀 빙글빙글",
@@ -3171,6 +3225,7 @@ const World = {
       if (name === "yard") for (const k of ["schedBoard", "sportBoard"]) if (this.boards[k]) { this.rooms[name] = b; this.setBoard(k, this.boards[k]); }
       if (name === "worship") { this.rooms[name] = b; this.setThanks(this.thanksN); }
       if (name === "yard" && this.cookieN != null) { this.rooms[name] = b; this.setCookieCount(this.cookieN); }
+      if (name === "yard" && this.rinkTop) { this.rooms[name] = b; this.setRinkBoard(this.rinkTop); }
       if (name === "praise" && this.recList.length) { this.rooms[name] = b; this.setRecBoard(this.recList); }
       this.applySeasons(b); if (b.night) this.applyNight(b);
     }
@@ -3358,6 +3413,16 @@ const World = {
     if (r.showroom.key === n) return; r.showroom.key = n;
     const old = r.showroom.boardMat.map; r.showroom.boardMat.map = showBoardTex(n); r.showroom.boardMat.needsUpdate = true; old && old.dispose();
   },
+  // 👏 박수 동작 (1.6초)
+  clap(id) { const a = this.actors && this.actors.get ? this.actors.get(id) : null; if (a) a.clapUntil = performance.now() + 1600; },
+  // 내 자리가 스케이트장 구경 자리(벤치·펜스)인지
+  rinkSeat(seat) { return !!(this.roomName === "yard" && this.room && seat && this.room.seats[seat] && this.room.seats[seat].rink); },
+  // 🏆 스케이트장 랭킹판 바꾸기 ({figure:[{name,score}], speed:[...]})
+  setRinkBoard(d) {
+    this.rinkTop = d; const r = this.rooms.yard; if (!r || !r.rink) return;
+    const key = JSON.stringify(d); if (r.rink.key === key) return; r.rink.key = key;
+    const old = r.rink.boardMat.map; r.rink.boardMat.map = rinkBoardTex(d); r.rink.boardMat.needsUpdate = true; old && old.dispose();
+  },
   SHOW, AD, COSTUMES, RINK, FIGURES, onIce, rinkRacePos, rinkLapLen, raceMe: null,
   // 경주가 끝나면 내 캐릭터를 그 자리에 세워요
   placeMe(x, z) { const a = this.me(); if (!a) return; a.pos.x = x; a.pos.z = z; a.path = []; a.goal = { x, z, seat: null }; a.seat = null; },
@@ -3479,6 +3544,11 @@ const World = {
       if (e < s0) { g.rotation.x = 0.3; L.rotation.set(-0.5, 0, 0); R.rotation.set(-0.5, 0, 0); }
       else if (e < s0 + air) { const q = (e - s0) / air; g.position.y = 4 * h * q * (1 - q); a.outer.rotation.y = a.yaw + q * n * Math.PI * 2; AL.rotation.set(-0.3, 0, -0.2); AR.rotation.set(-0.3, 0, 0.2); L.rotation.set(0, 0, 0.1); R.rotation.set(-0.3, 0, -0.1); }
       else { a.outer.rotation.y = a.yaw + n * Math.PI * 2; R.rotation.set(-1.1, 0, 0); AL.rotation.set(0, 0, 1.3); AR.rotation.set(0, 0, -1.3); }
+    } else if (k === "fall") { // 뛰어올랐다가 엉덩방아 → 일어나기
+      if (e < 0.3) { g.rotation.x = 0.3; L.rotation.set(-0.5, 0, 0); R.rotation.set(-0.5, 0, 0); }
+      else if (e < 0.85) { const q = (e - 0.3) / 0.55; g.position.y = 2.4 * q * (1 - q); a.outer.rotation.y = a.yaw + q * Math.PI * 3; }
+      else if (e < 1.9) { const q = Math.min(1, (e - 0.85) * 5); a.outer.rotation.y = a.yaw + Math.PI * 3; g.position.y = -0.3 * q; g.rotation.x = -0.35 * q; L.rotation.set(-1.45 * q, 0, 0.15); R.rotation.set(-1.45 * q, 0, -0.15); AL.rotation.set(-0.6, 0, 0.9); AR.rotation.set(-0.6, 0, -0.9); }
+      else { const q = 1 - (e - 1.9) / 0.5; a.outer.rotation.y = a.yaw + Math.PI * 3; g.position.y = -0.3 * q; g.rotation.x = -0.35 * q; L.rotation.set(-1.45 * q, 0, 0); R.rotation.set(-1.45 * q, 0, 0); }
     } else if (k === "bow") { a.outer.rotation.y = a.yaw; g.rotation.x = 0.6 * Math.sin(Math.min(1, u) * Math.PI); AL.rotation.set(0, 0, 0.9); AR.rotation.set(-0.5, 0, -0.2); R.rotation.set(0.3, 0, 0); }
     void turn; void t;
   },
@@ -3940,6 +4010,12 @@ const World = {
       this.jamPose(a, seated, walking, t);
       this.dancePose(a, seated, walking, t);
       this.skatePose(a, seated, walking, t, nowMs);
+      // 🙌 펜스에 기대기: 몸을 살짝 숙이고 두 팔을 펜스 위에
+      const leanNow = !!(seated && seated.lean);
+      if (leanNow) { a.ch.group.rotation.x = 0.3; a.ch.armL.rotation.set(-1.35, 0, 0.3); a.ch.armR.rotation.set(-1.35, 0, -0.3); a.leaning = true; }
+      else if (a.leaning) { a.leaning = false; if (!a.skating) a.ch.group.rotation.x = 0; }
+      // 👏 박수: 두 손을 앞에서 짝짝
+      if (a.clapUntil && performance.now() < a.clapUntil) { const c = Math.sin(t * 22) * 0.28; a.ch.armL.rotation.set(-1.35, 0, -0.3 + c); a.ch.armR.rotation.set(-1.35, 0, 0.3 - c); }
       // ✨ 특별 스킨 움직임: 별은 둥실둥실 돌고, 새싹은 살랑살랑, 비둘기는 고개 까딱
       if (a.ch.halo) { const hb = a.ch.halo; if (a.ch.haloStar) { hb.rotation.y = t * 1.4; hb.position.y = hb.userData.baseY + Math.sin(t * 2.2) * 0.04; } else hb.rotation.z = Math.sin(t * 2.4 + a.id.charCodeAt(0)) * 0.12; }
       if (a.ch.dove) a.ch.dove.rotation.x = Math.sin(t * 3 + 1) * 0.08;

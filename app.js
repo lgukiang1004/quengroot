@@ -326,6 +326,19 @@ class DemoBackend {
   async missionMe() { return { log: [], books: [], resolve: null }; }
   // 🧀 쇼룸 · 주문 (데모)
   async cookieCount() { return store.get("demo_cookie", 128); }
+  // ⛸ 스케이트장 랭킹 (데모: 이 기기에만 저장 + 가상 친구들)
+  async rinkScoreAdd(kind, score, song) {
+    const k = "demo_rink_" + kind, old = store.get(k, null), better = !old || (kind === "figure" ? score > old.score : score < old.score);
+    if (better) store.set(k, { score, song: song || "", name: clip(S.profile?.name, LIMIT.name) || "익명" });
+    const best = better ? score : old.score, list = await this.rinkTop(kind);
+    return { best, rank: list.findIndex((r) => r.me) + 1, new: better };
+  }
+  async rinkTop(kind) {
+    const bots = kind === "figure" ? [["은혜", 58.4, "silent"], ["요셉", 47.2, "jingle"], ["소망", 39.8, "grace"], ["하늘", 31.5, "joy"]] : [["다니엘", 14.8, ""], ["요한", 17.3, ""], ["하늘", 21.6, ""]];
+    const rows = bots.map(([name, score, song]) => ({ name, score, song, me: false })), mine = store.get("demo_rink_" + kind, null);
+    if (mine) rows.push({ name: mine.name, score: mine.score, song: mine.song, me: true });
+    return rows.sort((a, b) => (kind === "figure" ? b.score - a.score : a.score - b.score)).slice(0, 10);
+  }
   async cookieMake() { const n = store.get("demo_cookie", 128) + 1; store.set("demo_cookie", n); return n; }
   _ord() { return store.get("demo_orders", null) || [{ id: 1, name: "은혜", contact: "010-1234-5678", qty_s: 2, qty_l: 1, pickup: "church", memo: "주일 2부 끝나고 받을게요!", total: 31, status: "new", created_at: new Date(Date.now() - 40 * 60e3).toISOString() }]; }
   async orderAdd(o) { const l = this._ord(), id = Math.max(0, ...l.map((x) => x.id)) + 1; l.unshift({ id, ...o, total: o.qty_s * CM_PRICE.s + o.qty_l * CM_PRICE.l, status: "new", created_at: new Date().toISOString() }); store.set("demo_orders", l); return id; }
@@ -541,7 +554,7 @@ class SupaBackend {
     const { data, error } = await this.sb.rpc(fn, args);
     if (error) {
       // Supabase에 SQL이 아직 적용되지 않았을 때: 알아보기 쉬운 안내로 바꿔요
-      if (/schema cache|does not exist/i.test(error.message)) { console.warn(error.message); throw new Error(`아직 준비 중인 기능이에요. 관리자: Supabase에서 ${/^(mission_|cookie_|order_|admin_order|push_order)/.test(fn) ? "supabase-update-missions.sql" : /^(admin_role|admin_set_role_pw|notice_|quiz_set_books|quiz_reset|quiz_submit_g|quiz_ranking_g|challenge_add|challenge_delete|song_save|song_delete|song_clear_set|sheet_)/.test(fn) ? "supabase-update-groups.sql" : /song_rec/.test(fn) ? "supabase-update-praise.sql" : /quiz/.test(fn) ? "supabase-update-quiz.sql" : /setting|event|reading|challenge|testimon|sport|push/.test(fn) ? "supabase-update-community.sql" : "supabase-update-footprints.sql"}을 실행해 주세요`); }
+      if (/schema cache|does not exist/i.test(error.message)) { console.warn(error.message); throw new Error(`아직 준비 중인 기능이에요. 관리자: Supabase에서 ${/^(mission_|cookie_|order_|admin_order|push_order|rink_)/.test(fn) ? "supabase-update-missions.sql" : /^(admin_role|admin_set_role_pw|notice_|quiz_set_books|quiz_reset|quiz_submit_g|quiz_ranking_g|challenge_add|challenge_delete|song_save|song_delete|song_clear_set|sheet_)/.test(fn) ? "supabase-update-groups.sql" : /song_rec/.test(fn) ? "supabase-update-praise.sql" : /quiz/.test(fn) ? "supabase-update-quiz.sql" : /setting|event|reading|challenge|testimon|sport|push/.test(fn) ? "supabase-update-community.sql" : "supabase-update-footprints.sql"}을 실행해 주세요`); }
       throw new Error(error.message);
     }
     return data;
@@ -684,6 +697,8 @@ class SupaBackend {
   // ---- 🎯 미션 · 🧀 쇼룸 · 🛒 주문 (supabase-update-missions.sql) ----
   missionAdd(kind, note) { return this._rpc("mission_add", { p_token: token, p_name: clip(S.profile?.name, LIMIT.name), p_kind: kind, p_note: note || null }); }
   missionMe() { return this._rpc("mission_me", { p_token: token }); }
+  rinkScoreAdd(kind, score, song) { return this._rpc("rink_score_add", { p_token: token, p_name: clip(S.profile?.name, LIMIT.name) || "", p_kind: kind, p_score: score, p_song: song || "" }); }
+  rinkTop(kind) { return this._rpc("rink_top", { p_kind: kind, p_token: token }); }
   async cookieCount() { const { data, error } = await this.sb.from("showroom_counter").select("boxes").eq("id", 1).maybeSingle(); if (error) throw new Error(error.message); return data ? Number(data.boxes) : 0; }
   cookieMake() { return this._rpc("cookie_make", { p_token: token }); }
   orderAdd(o) { return this._rpc("order_add", { p_token: token, p_name: o.name, p_contact: o.contact, p_s: o.qty_s, p_l: o.qty_l, p_pickup: o.pickup, p_memo: o.memo || "" }); }
@@ -750,6 +765,7 @@ function meState() {
     jam: S.room === "praise" ? jamPresence() : null,
     skr: S.room === "yard" && typeof SK !== "undefined" ? skState() : null, // ⛸ 경주 중
     fig: S.room === "yard" && S.fig ? S.fig : null,                         // ⛸ 피겨 기술
+    fpr: S.room === "yard" && typeof SK !== "undefined" && SK.prog && !SK.prog.done ? SK.prog.song.id : null, // 🩰 피겨 연기 중인 곡
     cd: S.room === "praise" ? S.cdShare || null : null,
     amens: S.amens, joinedAt: S.joinedAt,
     pos: S.pos, seat: S.seat,
@@ -901,6 +917,7 @@ let worldReady = false, visitTimer = null;
 function joinRoom(room, from) {
   if (S.room === "yard" && room !== "yard" && BB.holder === myId) bbDrop(); // 공은 운동장에 두고 가요
   if (typeof SK !== "undefined" && SK.race) { SK.race = null; W.raceMe = null; W.keyBlock = false; clearInterval(SK.tick); }
+  if (typeof SK !== "undefined" && SK.prog) figAbort();
   if (!$("#cookModal").hidden) closeModal("cookModal");
   if (!$("#cmGameModal").hidden) closeModal("cmGameModal");
   if (!$("#quizModal").hidden && !GB_ROOMS.includes(room)) closeModal("quizModal");
@@ -938,7 +955,7 @@ function joinRoom(room, from) {
   renderTraces();
   if (GB_ROOMS.includes(room)) { loadGuestbook(room); loadQuizMeta(); }
   if (NOTICE_ROOMS[room]) loadNotices(room);
-  if (room === "yard") { loadFood(); loadCatFeeds(); loadCookie(); }
+  if (room === "yard") { loadFood(); loadCatFeeds(); loadCookie(); setTimeout(loadRinkTop, 800); }
   if (room === "showroom") { loadCookie(); renderShowPanel(); }
   // 4초 넘게 머물면 "다녀갔어요" 발자취를 남겨요
   clearTimeout(visitTimer);
@@ -1760,6 +1777,7 @@ function onSport(m) {
   else if (m.k === "rally") onRally(m);
   else if (m.k === "bbgame") onGame(m);
   else if (m.k === "skstart") onSkStart(m);
+  else if (m.k === "clap") { if (S.room === "yard") onClap(m); }
 }
 // ---- 아래 운동장 막대 ----
 function renderSportBar(force) {
@@ -4322,7 +4340,7 @@ $$("[data-cookie-play]").forEach((b) => (b.onclick = () => startCookie()));
 
 /* ================= ⛸ 그루터기 스케이트장 (2026-11-18) ================= */
 // 얼음 위에 서면 아래에 스케이트 막대가 나와요. 🏁 스피드 경주(2바퀴) · 피겨 기술. 서버 저장 없이 실시간 방송("sport" k:"skstart") + 내 상태(skr, fig)만 써요
-var SK = { race: null, tick: null, lastSend: 0, best: store.get("skBest", null), barKey: "" };
+var SK = { race: null, tick: null, lastSend: 0, best: store.get("skBest", null), barKey: "", prog: null, ptick: null, rankTab: "figure" };
 const RACE_LAPS = 2;
 function onIceMe() { const a = S.room === "yard" && W.actorPos(myId); return !!a && W.onIce(a.x, a.z); }
 function goRink() {
@@ -4332,12 +4350,12 @@ function goRink() {
 }
 function skState() { return SK.race ? { t0: SK.race.t0, p: +SK.race.p.toFixed(3), v: +SK.race.v.toFixed(2), lane: SK.race.lane, done: SK.race.done || 0 } : null; }
 function skSend(force) { const now = Date.now(); if (!force && now - SK.lastSend < 250) return; SK.lastSend = now; S.peers = S.peers.filter((p) => p.id !== myId).concat(meState()); api.update(meState()); }
-// 🏁 경주 시작: 지금 얼음 위에 있는 사람 모두가 참가 (3.5초 뒤 출발)
+// 🏁 경주 시작: 지금 얼음 위에 있는 사람 모두가 참가 (6초 뒤 출발 — 그동안 방법 설명이 떠요)
 function skStartRace() {
   if (SK.race) return;
   const ids = S.peers.filter((p) => { const a = W.actorPos(p.id); return a && W.onIce(a.x, a.z) && !p.skr; }).map((p) => p.id).slice(0, 4);
   if (!ids.includes(myId)) ids.unshift(myId);
-  const m = { k: "skstart", t0: Date.now() + 3500, ids, by: myId, name: clip(S.profile?.name, LIMIT.name) || "익명" };
+  const m = { k: "skstart", t0: Date.now() + 6000, ids, by: myId, name: clip(S.profile?.name, LIMIT.name) || "익명" };
   api.sendSport(m); onSkStart(m);
 }
 function onSkStart(m) {
@@ -4345,10 +4363,11 @@ function onSkStart(m) {
   const lane = m.ids.indexOf(myId);
   if (lane < 0) { if (onIceMe()) toast(`🏁 ${clip(m.name, 10)}님이 스피드 경주를 시작해요! 구경해요 👀`); return; }
   if (SK.race) return;
+  if (SK.prog) figAbort("경주가 시작돼서 연기를 멈췄어요");
   S.seat = null; S.dance = null; S.fig = null;
   SK.race = { t0: m.t0, lane: Math.min(3, lane), p: 0, v: 0, foot: null, done: 0, ids: m.ids, ended: false };
   W.raceMe = skState(); W.keyBlock = true;
-  [3, 2, 1].forEach((n, i) => setTimeout(() => SK.race && toast(n === 1 ? "1… 🏁" : `${n}…`), Math.max(0, m.t0 - Date.now() - 3000 + i * 1000)));
+  skHelpShow(m.t0);
   setTimeout(() => SK.race && toast("출발! ⏪⏩ 왼발·오른발을 번갈아 눌러요 (← → 키도 돼요)"), Math.max(0, m.t0 - Date.now()));
   clearInterval(SK.tick); let last = performance.now();
   SK.tick = setInterval(() => {
@@ -4357,7 +4376,8 @@ function onSkStart(m) {
     if (Date.now() >= R.t0 && !R.done) {
       R.v *= Math.exp(-0.55 * dt);
       R.p += (R.v * dt) / W.rinkLapLen(R.lane);
-      if (R.p >= RACE_LAPS) { R.p = RACE_LAPS; R.done = Date.now(); R.v = 0; const sec = (R.done - R.t0) / 1000; const pb = !SK.best || sec < SK.best; if (pb) { SK.best = sec; store.set("skBest", sec); } toast(`🏁 결승! ${sec.toFixed(2)}초${pb ? " · 🎉 내 최고 기록!" : ""}`); S.bubble = `⛸ ${RACE_LAPS}바퀴 ${sec.toFixed(1)}초!`; S.kind = "status"; S.amens = 0; skSend(true); }
+      if (R.p >= RACE_LAPS) { R.p = RACE_LAPS; R.done = Date.now(); R.v = 0; const sec = (R.done - R.t0) / 1000; const pb = !SK.best || sec < SK.best; if (pb) { SK.best = sec; store.set("skBest", sec); } toast(`🏁 결승! ${sec.toFixed(2)}초${pb ? " · 🎉 내 최고 기록!" : ""}`); S.bubble = `⛸ ${RACE_LAPS}바퀴 ${sec.toFixed(1)}초!`; S.kind = "status"; S.amens = 0; skSend(true);
+        api.rinkScoreAdd("speed", Math.round(sec * 100) / 100, "").then((r) => { if (r && r.new) toast(`🏆 스피드 랭킹 ${r.rank}등!`); loadRinkTop(); }).catch((e) => console.warn("스피드 기록:", e.message)); }
     }
     W.raceMe = skState(); skSend(false); renderSkateBar();
     // 모두 들어오거나 90초가 지나면 결과 발표 후 끝
@@ -4387,25 +4407,253 @@ function skEnd() {
   S.pos = { x: +q.x.toFixed(2), z: +q.z.toFixed(2) }; S.seat = null; W.placeMe(S.pos.x, S.pos.z);
   refreshMe(); renderSkateBar(true);
 }
+/* ---- 🩰 피겨 연기: 음악 고르기 · 박자 점수 · 관중 박수 · 랭킹 (2026-11-18) ----
+   곡은 모두 저작권이 끝난 곡을 사이트가 직접 연주해요 (파일 없음). 박자에 맞춰 기술을 누르면 가산점 */
+const FIG_SONGS = [
+  { id: "silent", e: "🌙", name: "고요한 밤", feel: "잔잔한 왈츠", style: "68", bpm: 168, pulse: 3, passes: 2, off: 0,
+    mel: [[67, 1.5], [69, .5], [67, 1], [64, 3], [67, 1.5], [69, .5], [67, 1], [64, 3], [74, 2], [74, 1], [71, 3], [72, 2], [72, 1], [67, 3],
+      [69, 2], [69, 1], [72, 1.5], [71, .5], [69, 1], [67, 1.5], [69, .5], [67, 1], [64, 3], [69, 2], [69, 1], [72, 1.5], [71, .5], [69, 1], [67, 1.5], [69, .5], [67, 1], [64, 3],
+      [74, 2], [74, 1], [77, 1.5], [74, .5], [71, 1], [72, 3], [76, 3], [72, 1.5], [67, .5], [64, 1], [67, 1.5], [65, .5], [62, 1], [60, 6]],
+    chords: [["C", 6], ["C", 6], ["G7", 6], ["C", 6], ["F", 6], ["C", 6], ["F", 6], ["C", 6], ["G7", 6], ["C", 6], ["C", 3], ["G7", 3], ["C", 6]] },
+  { id: "grace", e: "🕊", name: "나 같은 죄인 살리신", feel: "따뜻한 3박자", style: "waltz", bpm: 100, pulse: 1, passes: 2, off: 1,
+    mel: [[62, 1], [67, 2], [71, .5], [67, .5], [71, 2], [69, 1], [67, 2], [64, 1], [62, 2], [62, 1], [67, 2], [71, .5], [67, .5], [71, 2], [69, 1], [74, 3],
+      [74, 2], [71, 1], [74, 2], [71, .5], [67, .5], [71, 2], [69, 1], [67, 2], [64, 1], [62, 2], [62, 1], [67, 2], [71, .5], [67, .5], [71, 2], [69, 1], [67, 3], [67, 2]],
+    chords: [["G", 3], ["Em", 3], ["C", 3], ["G", 3], ["G", 3], ["Em", 1.5], ["A7", 1.5], ["Am", 3], ["D7", 3], ["Bm", 3], ["Em", 3], ["C", 3], ["Bm", 1.5], ["E7", 1.5], ["Am", 3], ["D7", 3], ["G", 3], ["G", 2]] },
+  { id: "joy", e: "🎺", name: "기뻐하며 경배하세", feel: "힘찬 4박자 (베토벤)", style: "march", bpm: 112, pulse: 1, passes: 2, off: 0,
+    mel: [[76, 1], [76, 1], [77, 1], [79, 1], [79, 1], [77, 1], [76, 1], [74, 1], [72, 1], [72, 1], [74, 1], [76, 1], [76, 1.5], [74, .5], [74, 2],
+      [76, 1], [76, 1], [77, 1], [79, 1], [79, 1], [77, 1], [76, 1], [74, 1], [72, 1], [72, 1], [74, 1], [76, 1], [74, 1.5], [72, .5], [72, 2],
+      [74, 1], [74, 1], [76, 1], [72, 1], [74, 1], [76, .5], [77, .5], [76, 1], [72, 1], [74, 1], [76, .5], [77, .5], [76, 1], [74, 1], [72, 1], [74, 1], [67, 2],
+      [76, 1], [76, 1], [77, 1], [79, 1], [79, 1], [77, 1], [76, 1], [74, 1], [72, 1], [72, 1], [74, 1], [76, 1], [74, 1.5], [72, .5], [72, 2]],
+    chords: [["C", 4], ["Dm", 2], ["G7", 2], ["C", 2], ["Am", 2], ["Dm", 2], ["G7", 2], ["C", 4], ["Dm", 2], ["G7", 2], ["C", 2], ["Am", 2], ["Dm", 2], ["C", 2],
+      ["Dm", 4], ["Em", 2], ["A7", 2], ["Dm", 2], ["G7", 2], ["C", 2], ["G7", 2], ["C", 4], ["Dm", 2], ["G7", 2], ["Em", 2], ["A7", 2], ["Dm", 2], ["C", 2]] },
+  { id: "jingle", e: "🔔", name: "징글벨", feel: "신나는 썰매 리듬", style: "jingle", bpm: 132, pulse: 1, passes: 2, off: 0,
+    mel: [[76, 1], [76, 1], [76, 2], [76, 1], [76, 1], [76, 2], [76, 1], [79, 1], [72, 1.5], [74, .5], [76, 4], [77, 1], [77, 1], [77, 1.5], [77, .5], [77, 1], [76, 1], [76, 1], [76, .5], [76, .5],
+      [76, 1], [74, 1], [74, 1], [76, 1], [74, 2], [79, 2], [76, 1], [76, 1], [76, 2], [76, 1], [76, 1], [76, 2], [76, 1], [79, 1], [72, 1.5], [74, .5], [76, 4],
+      [77, 1], [77, 1], [77, 1.5], [77, .5], [77, 1], [76, 1], [76, 1], [76, .5], [76, .5], [79, 1], [79, 1], [77, 1], [74, 1], [72, 4]],
+    chords: [["C", 4], ["C", 4], ["C", 4], ["C", 4], ["F", 4], ["C", 4], ["D7", 4], ["G7", 4], ["C", 4], ["C", 4], ["C", 4], ["C", 4], ["F", 4], ["C", 4], ["G7", 4], ["C", 4]] },
+];
+const FIG_EL = { spin: 1.5, spiral: 1.8, camel: 2.0, layback: 2.4, axel: 3.3, triple: 8.0 }; // 기본 점수
+const FIG_MAX_EL = 12;
+// 음악 연주기: 곡 하나를 미리 계산한 음표 목록으로 조금씩 앞서 예약해서 틀어요
+const SkMusic = {
+  cur: null,
+  chordNotes(name) {
+    const m = /^([A-G])([b#]?)(maj7|m7|m|7)?$/.exec(name) || [, "C", "", ""], PC = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+    const pc = (PC[m[1]] + (m[2] === "#" ? 1 : m[2] === "b" ? -1 : 0) + 12) % 12, q = m[3] || "";
+    const iv = q === "m" ? [0, 3, 7] : q === "7" ? [0, 4, 7, 10] : q === "maj7" ? [0, 4, 7, 11] : q === "m7" ? [0, 3, 7, 10] : [0, 4, 7];
+    return { root: pc, iv };
+  },
+  events(song) {
+    const ev = [], passLen = song.mel.reduce((a, [, d]) => a + d, 0);
+    for (let ps = 0; ps < song.passes; ps++) {
+      const T0 = ps * passLen; let b = 0;
+      for (const [n, d] of song.mel) { ev.push({ u: T0 + b, k: "mel", m: n + (ps === 1 && song.style === "68" ? 12 : 0), d, v: ps ? 0.13 : 0.16 }); b += d; }
+      b = song.off;
+      for (const [name, d] of song.chords) {
+        const c = this.chordNotes(name), bass = 40 + ((c.root + 8) % 12), mid = (k) => 55 + ((c.root + c.iv[k % c.iv.length] + 5) % 12);
+        for (let k = 0; k < Math.ceil(d - 1e-6); k++) {
+          const u = T0 + b + k;
+          if (song.style === "68") { if (k % 3 === 0) ev.push({ u, k: "bass", m: k % 6 === 0 ? bass : bass + 7, d: 2.5, v: 0.2 }); else ev.push({ u, k: "arp", m: mid(k) + 12, d: 1.5, v: 0.05 }); }
+          else if (song.style === "waltz") { if (k % 3 === 0) ev.push({ u, k: "bass", m: bass, d: 1, v: 0.22 }); else ev.push({ u, k: "stab", notes: c.iv.slice(0, 3).map((_, j) => mid(j)), d: 0.6, v: 0.04 }); }
+          else { if (k % 2 === 0) ev.push({ u, k: "bass", m: k % 4 === 0 ? bass : bass + 7, d: 0.9, v: 0.22 }); else ev.push({ u, k: "stab", notes: c.iv.slice(0, 3).map((_, j) => mid(j)), d: 0.45, v: 0.05 });
+            ev.push({ u, k: "tick", v: k % 2 ? 0.05 : 0.03 }); if (song.style === "jingle") ev.push({ u: u + 0.5, k: "bell", v: 0.05 }), ev.push({ u, k: "bell", v: 0.07 }); }
+        }
+        b += d;
+      }
+    }
+    ev.sort((x, y) => x.u - y.u);
+    return { ev, units: passLen * song.passes };
+  },
+  // song을 틀어요. 돌려주는 값: {t0: 시작(오디오 시각), spu: 한 박 길이(초), dur, end}
+  play(song, opts = {}) {
+    if (!Sound.ensure()) return null;
+    this.stop(true);
+    const ctx = Sound.ctx, out = ctx.createGain(), vol = opts.preview ? 0.4 : 0.55;
+    out.gain.setValueAtTime(0.0001, ctx.currentTime); out.gain.linearRampToValueAtTime(vol, ctx.currentTime + 0.25); out.connect(ctx.destination);
+    const dl = ctx.createDelay(); dl.delayTime.value = 0.28; const fb = ctx.createGain(); fb.gain.value = 0.25; const wet = ctx.createGain(); wet.gain.value = 0.22; dl.connect(fb); fb.connect(dl); dl.connect(wet); wet.connect(out);
+    const mf = (m) => 440 * Math.pow(2, (m - 69) / 12), nb = Sound.noiseBuf("white", 1);
+    const tone = (m, t, dur, v, type, oct) => { const o = ctx.createOscillator(), g = ctx.createGain(); o.type = type; o.frequency.value = mf(m) * (oct || 1); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0006, t + Math.max(0.2, dur)); o.connect(g); g.connect(out); g.connect(dl); o.start(t); o.stop(t + Math.max(0.2, dur) + 0.05); };
+    const noise = (t, v, f, len) => { const sN = ctx.createBufferSource(); sN.buffer = nb; const fl = ctx.createBiquadFilter(); fl.type = "highpass"; fl.frequency.value = f; const g = ctx.createGain(); g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.0004, t + len); sN.connect(fl); fl.connect(g); g.connect(out); sN.start(t, Math.random() * 0.5); sN.stop(t + len + 0.02); };
+    const spu = 60 / song.bpm, { ev, units } = this.events(song), t0 = ctx.currentTime + 0.35, dur = units * spu;
+    const playE = (e, t) => {
+      if (e.k === "mel") { tone(e.m, t, e.d * spu * 1.1, e.v, "sine"); tone(e.m, t, e.d * spu * 0.6, e.v * 0.35, "triangle", 2); }
+      else if (e.k === "bass") tone(e.m, t, e.d * spu, e.v, "triangle");
+      else if (e.k === "arp") tone(e.m, t, e.d * spu, e.v, "sine");
+      else if (e.k === "stab") e.notes.forEach((n) => tone(n, t, e.d * spu, e.v, "triangle"));
+      else if (e.k === "tick") noise(t, e.v, 7000, 0.06);
+      else if (e.k === "bell") noise(t, e.v, 9000, 0.12);
+    };
+    let i = 0; const stopAt = opts.preview ? t0 + opts.preview : t0 + dur;
+    const tick = () => { const hz = ctx.currentTime + 0.6; while (i < ev.length && t0 + ev[i].u * spu < hz) { const t = t0 + ev[i].u * spu; if (t < stopAt && t > ctx.currentTime - 0.05) playE(ev[i], Math.max(t, ctx.currentTime)); i++; } };
+    tick(); const timer = setInterval(tick, 120);
+    // 배경음은 잠깐 작게
+    if (Sound.master) { try { Sound.master.gain.setTargetAtTime(0.04, ctx.currentTime, 0.3); } catch (e) {} }
+    const cur = { song, t0, spu, dur, end: t0 + dur, out, timer, preview: !!opts.preview };
+    cur.endTimer = setTimeout(() => this.stop(), (stopAt - ctx.currentTime + 1.2) * 1000);
+    this.cur = cur; return cur;
+  },
+  stop(quick) {
+    const c = this.cur; if (!c) return; this.cur = null;
+    clearInterval(c.timer); clearTimeout(c.endTimer);
+    const ctx = Sound.ctx; try { c.out.gain.cancelScheduledValues(ctx.currentTime); c.out.gain.setTargetAtTime(0, ctx.currentTime, quick ? 0.05 : 0.4); } catch (e) {}
+    setTimeout(() => { try { c.out.disconnect(); } catch (e) {} }, 2000);
+    if (Sound.master && Sound.on) { try { Sound.master.gain.setTargetAtTime(S.room === "worship" ? 0.22 : S.room === "room301" ? 0.18 : 0.32, ctx.currentTime, 0.6); } catch (e) {} }
+  },
+};
+// 👏 짝 소리
+function clapSound() {
+  if (!Sound.ensure()) return; const ctx = Sound.ctx, nb = Sound.noiseBuf("white", 1);
+  for (let k = 0; k < 4; k++) { const t = ctx.currentTime + k * 0.17, sN = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(); sN.buffer = nb; f.type = "bandpass"; f.frequency.value = 1400 + Math.random() * 500; f.Q.value = 0.8; g.gain.setValueAtTime(0.25, t); g.gain.exponentialRampToValueAtTime(0.0005, t + 0.09); sN.connect(f); f.connect(g); g.connect(ctx.destination); sN.start(t, Math.random() * 0.5); sN.stop(t + 0.12); }
+}
+function figOpen() { // 곡 고르기 창
+  if (SK.race) return toast("경주가 끝나고 해요");
+  if (!onIceMe()) { goRink(); return toast("⛸ 얼음 위에 올라가서 연기해요"); }
+  SK.view = "songs"; $("#rinkTitle").textContent = "🩰 피겨 연기 · 음악 고르기";
+  const body = $("#rinkBody");
+  body.replaceChildren(
+    h("div", { class: "fig-rules" },
+      h("b", { text: "이렇게 해요" }),
+      h("ul", {},
+        h("li", { text: "음악이 나오면 아래 기술 버튼을 눌러요. 🎵 박자 불빛이 켜질 때 누르면 Perfect 가산점!" }),
+        h("li", { text: "같은 기술은 2번까지만 점수 · 여러 기술을 섞으면 예술 점수 UP" }),
+        h("li", { text: "💫 트리플 악셀은 점수가 크지만 넘어질 수도 있어요 (박자에 맞추면 덜 넘어져요)" }),
+        h("li", { text: "음악이 끝날 때쯤 🙇 인사로 마무리하면 보너스 · 구경하는 친구들의 👏 박수도 점수가 돼요" }))),
+    h("div", { class: "fig-songs" }, ...FIG_SONGS.map((sg) => {
+      const sec = Math.round((sg.mel.reduce((a, [, d]) => a + d, 0) * sg.passes * 60) / sg.bpm);
+      return h("div", { class: "fig-song" },
+        h("span", { class: "e", text: sg.e }), h("div", { class: "t" }, h("b", { text: sg.name }), h("small", { text: `${sg.feel} · ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}` })),
+        h("button", { class: "btn ghost sm", text: "▶ 미리 듣기", onclick: () => { SkMusic.play(sg, { preview: 7 }); } }),
+        h("button", { class: "btn primary sm", text: "이 곡으로 연기", onclick: () => { SkMusic.stop(true); closeModal("rinkModal"); figStart(sg); } }));
+    })),
+    h("p", { class: "muted tiny", text: "곡은 모두 저작권이 끝난 찬송·캐럴·클래식이고, 사이트가 직접 연주해요." }));
+  openModal("rinkModal");
+}
+function figStart(song) {
+  if (!onIceMe() || SK.race) return;
+  S.seat = null; S.fig = null;
+  const m = SkMusic.play(song); if (!m) return toast("이 브라우저에서는 소리를 낼 수 없어요");
+  SK.prog = { song, m, pulse: m.spu * song.pulse, els: [], counts: {}, falls: 0, claps: 0, clappers: new Set(), tes: 0, done: false, startedAt: Date.now() };
+  toast(`🎵 ${song.name} · 박자 불빛에 맞춰 기술을 눌러요!`);
+  refreshMe(); renderSkateBar(true);
+  clearInterval(SK.ptick);
+  SK.ptick = setInterval(() => {
+    const P = SK.prog; if (!P || P.done) { clearInterval(SK.ptick); return; }
+    if (!onIceMe()) { figAbort("얼음 밖으로 나가서 연기를 멈췄어요"); return; }
+    const now = Sound.ctx.currentTime, ph = (now - P.m.t0) / P.pulse, fr = ph - Math.floor(ph);
+    const dot = document.querySelector("#skateBar .sk-beat"); if (dot) dot.style.opacity = ph < 0 ? 0.25 : String(Math.max(0.25, 1 - fr * 1.6));
+    const t = $("#skateBar .sb-t"); if (t) { const left = Math.max(0, Math.ceil(P.m.end - now)); const tx = `🎵 ${P.song.name} · ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")} · ${(P.tes).toFixed(1)}점`; if (t.textContent !== tx) t.textContent = tx; }
+    if (now > P.m.end + 5) figFinish(false); // 인사 없이 끝
+  }, 50);
+}
+function figAbort(msg) { const P = SK.prog; if (!P) return; P.done = true; SK.prog = null; clearInterval(SK.ptick); SkMusic.stop(); if (msg) toast(msg); refreshMe(); renderSkateBar(true); }
+function figFeedback(txt, good) { const el = $("#skateBar .sk-fb"); if (!el) return; el.textContent = txt; el.classList.remove("pop", "bad"); void el.offsetWidth; el.classList.add("pop"); if (!good) el.classList.add("bad"); }
 function skFigure(k) {
   if (SK.race || !onIceMe()) return;
-  S.fig = { k, t0: Date.now() }; refreshMe();
-  const F = W.FIGURES[k];
-  SK.combo = (SK.combo || []).filter((x) => Date.now() - x.t < 20000).concat({ k, t: Date.now() });
-  const kinds = new Set(SK.combo.map((x) => x.k)).size;
-  if (k === "bow" && SK.combo.length > 2) { const sc = Math.min(10, 6 + kinds * 0.7 + Math.random() * 0.8).toFixed(1); toast(`🙇 연기 끝! 🏅 예술 점수 ${sc}점`); S.bubble = `⛸ 피겨 예술 점수 ${sc}점!`; S.kind = "status"; S.amens = 0; SK.combo = []; refreshMe(); }
-  else toast(`${F.name}!`);
-  setTimeout(() => { if (S.fig && S.fig.t0 && Date.now() - S.fig.t0 >= F.dur * 1000 - 50) { S.fig = null; refreshMe(); } }, F.dur * 1000 + 30);
+  const F = W.FIGURES[k], P = SK.prog && !SK.prog.done ? SK.prog : null;
+  if (S.fig && W.FIGURES[S.fig.k] && Date.now() - S.fig.t0 < W.FIGURES[S.fig.k].dur * 1000 - 150) { figFeedback("기술이 끝나고 눌러요"); return; }
+  if (P && k === "bow") { S.fig = { k, t0: Date.now() }; refreshMe(); figFinish(true); return; }
+  let showK = k;
+  if (P) {
+    if (Sound.ctx.currentTime < P.m.t0) return;
+    if (P.els.length >= FIG_MAX_EL) { figFeedback(`기술은 ${FIG_MAX_EL}개까지 · 🙇 인사로 마무리해요`); return; }
+    const ph = (Sound.ctx.currentTime - P.m.t0) / P.pulse, off = Math.abs(ph - Math.round(ph)); // 박자에서 벗어난 정도 (0~0.5박)
+    const q = off <= 0.09 ? 1 : off <= 0.3 ? 1 - (off - 0.09) / 0.21 : 0;
+    const n = (P.counts[k] || 0) + 1; P.counts[k] = n;
+    const rep = n === 1 ? 1 : n === 2 ? 0.7 : 0;
+    if (k === "triple" && Math.random() > 0.5 + 0.35 * q) { showK = "fall"; P.falls++; P.els.push({ k, pts: 0, q: 0, fall: true }); figFeedback("😵 넘어짐 -1.0"); }
+    else {
+      const pts = FIG_EL[k] * rep * (1 + 0.5 * q); P.els.push({ k, pts, q }); P.tes += pts;
+      figFeedback(rep === 0 ? `${F.name} · 반복이라 0점` : `${q >= 0.8 ? "✨ Perfect" : q > 0.25 ? "👍 Good" : "🎵 박자 놓침"} +${pts.toFixed(1)}`, rep > 0 && q > 0.25);
+    }
+  } else toast(`${F.name}! (연습 · 점수는 🩰 피겨 연기에서)`);
+  S.fig = { k: showK, t0: Date.now() }; refreshMe();
+  const D = W.FIGURES[showK].dur;
+  setTimeout(() => { if (S.fig && S.fig.t0 && Date.now() - S.fig.t0 >= D * 1000 - 50) { S.fig = null; refreshMe(); } }, D * 1000 + 30);
+  if (P) renderSkateBar(true);
+}
+async function figFinish(bowed) {
+  const P = SK.prog; if (!P || P.done) return; P.done = true; clearInterval(SK.ptick);
+  const now = Sound.ctx.currentTime, good = P.els.filter((e) => !e.fall);
+  const distinct = new Set(good.map((e) => e.k)).size;
+  const variety = Math.min(6, distinct) * 2.5, music = good.length ? (good.reduce((a, e) => a + e.q, 0) / good.length) * 10 * Math.min(1, good.length / 6) : 0;
+  const finish = bowed ? (now >= P.m.end - 7 ? 5 : 2) : 0, crowd = Math.min(3, P.claps * 0.2), ded = P.falls * 1.0;
+  const total = Math.max(0, Math.min(150, Math.round((P.tes + variety + music + finish + crowd - ded) * 10) / 10));
+  setTimeout(() => SkMusic.stop(), bowed ? 1500 : 0);
+  S.bubble = `🩰 ${P.song.name} · ${total.toFixed(1)}점!`; S.kind = "status"; S.amens = 0; refreshMe(); renderSkateBar(true);
+  const row = (l, v, cls) => h("div", { class: "fig-row " + (cls || "") }, h("span", { text: l }), h("b", { text: v }));
+  SK.view = "score"; $("#rinkTitle").textContent = "🩰 피겨 연기 점수";
+  const res = h("p", { class: "muted", text: "랭킹에 올리는 중…" });
+  $("#rinkBody").replaceChildren(
+    h("div", { class: "fig-total" }, h("small", { text: `${P.song.e} ${P.song.name}` }), h("b", { text: total.toFixed(1) }), h("span", { text: "점" })),
+    row(`⛸ 기술 점수 (기술 ${good.length}개)`, P.tes.toFixed(1)),
+    row(`🎨 예술 · 여러 기술 (${distinct}가지)`, variety.toFixed(1)),
+    row("🎵 예술 · 박자 맞추기", music.toFixed(1)),
+    row(bowed ? (finish === 5 ? "🙇 음악과 함께 마무리" : "🙇 인사 (조금 일찍)") : "🙇 인사 안 함", "+" + finish.toFixed(1)),
+    row(`👏 관중 박수 (${P.claps}번)`, "+" + crowd.toFixed(1)),
+    P.falls ? row(`😵 넘어짐 ${P.falls}번`, "-" + ded.toFixed(1), "bad") : null,
+    res,
+    h("div", { class: "modal-actions" }, h("button", { class: "btn primary", text: "🩰 다시 연기", onclick: () => figOpen() }), h("button", { class: "btn ghost", text: "🏆 랭킹 보기", onclick: () => openRinkRank("figure") })));
+  openModal("rinkModal");
+  SK.prog = null;
+  if (total <= 0) { res.textContent = "기술을 몇 개 해야 랭킹에 올라가요 🙂"; return; }
+  try { const r = await api.rinkScoreAdd("figure", total, P.song.id); res.textContent = r && r.new ? `🎉 내 최고 점수! 지금 ${r.rank}등이에요` : `내 최고 ${Number(r.best).toFixed(1)}점 · ${r.rank}등`; loadRinkTop(); }
+  catch (e) { res.textContent = "랭킹에 올리지 못했어요: " + e.message; }
+}
+// 👏 박수 (구경하는 사람) — 연기 중인 사람이 있으면 그 사람에게 관중 박수 점수
+function rinkPerformer() { const p = S.peers.find((x) => x.id !== myId && x.fpr && W.actorPos(x.id)); return p || null; }
+function skClap() {
+  const now = Date.now(); if (now - (SK.lastClap || 0) < 1200) return; SK.lastClap = now;
+  const perf = rinkPerformer(), m = { k: "clap", by: myId, name: clip(S.profile?.name, LIMIT.name) || "익명", to: perf ? perf.id : null };
+  api.sendSport(m); onClap(m);
+}
+function onClap(m) {
+  W.clap(m.by); floatAt(m.by, "👏", m.by === myId ? "나" : m.name);
+  if (S.room === "yard" && (nearRinkMe() || onIceMe())) clapSound();
+  const P = SK.prog; if (m.to === myId && P && !P.done && m.by !== myId) { P.claps++; P.clappers.add(m.by); if (P.claps <= 15) figFeedback(`👏 ${clip(m.name, 6)}님 박수 +0.2`, true); }
+}
+function nearRinkMe() { const a = S.room === "yard" && W.actorPos(myId); return !!a && a.x > 32.4 && a.x < 54 && a.z > -44 && a.z < 0.5; }
+// 🏆 랭킹
+var RINK_TOP = { figure: null, speed: null };
+async function loadRinkTop() {
+  try { const [f, sp] = await Promise.all([api.rinkTop("figure"), api.rinkTop("speed")]); RINK_TOP = { figure: f || [], speed: sp || [] }; W.setRinkBoard({ figure: RINK_TOP.figure.slice(0, 5), speed: RINK_TOP.speed.slice(0, 5) }); }
+  catch (e) { console.warn("스케이트장 랭킹 (supabase-update-missions.sql 실행 여부 확인):", e.message); }
+  if (!$("#rinkModal").hidden && SK.view === "rank") renderRinkRank();
+}
+function openRinkRank(tab) { SK.view = "rank"; SK.rankTab = tab || SK.rankTab || "figure"; $("#rinkTitle").textContent = "🏆 스케이트장 랭킹"; renderRinkRank(); openModal("rinkModal"); loadRinkTop(); }
+function renderRinkRank() {
+  const tab = SK.rankTab, list = RINK_TOP[tab], songName = (id) => { const sg = FIG_SONGS.find((x) => x.id === id); return sg ? sg.e + " " + sg.name : ""; };
+  $("#rinkBody").replaceChildren(
+    h("div", { class: "rink-seg" }, ...[["figure", "🩰 피겨 점수"], ["speed", "🏁 스피드 2바퀴"]].map(([k, l]) => h("button", { class: tab === k ? "on" : "", text: l, onclick: () => { SK.rankTab = k; renderRinkRank(); } }))),
+    list == null ? h("p", { class: "muted", text: "불러오는 중…" }) : !list.length ? h("p", { class: "muted", text: "아직 기록이 없어요. 첫 기록을 남겨 봐요! ⛸" })
+      : h("ol", { class: "rink-rank" }, ...list.map((r, i) => h("li", { class: r.me ? "me" : "" }, h("span", { class: "rk", text: ["🥇", "🥈", "🥉"][i] || String(i + 1) }), h("span", { class: "nm" }, r.name || "익명", tab === "figure" && r.song ? h("small", { text: songName(r.song) }) : null), h("b", { text: tab === "figure" ? Number(r.score).toFixed(1) + "점" : Number(r.score).toFixed(2) + "초" })))),
+    h("p", { class: "muted tiny", text: tab === "figure" ? "한 사람당 가장 높은 점수 하나가 올라가요" : "한 사람당 가장 빠른 기록 하나가 올라가요 (혼자 타도 기록돼요)" }),
+    onIceMe() ? h("div", { class: "modal-actions" }, h("button", { class: "btn primary", text: tab === "figure" ? "🩰 피겨 연기하기" : "🏁 경주 시작", onclick: () => { closeModal("rinkModal"); tab === "figure" ? figOpen() : skStartRace(); } })) : null);
+}
+// 🏁 스피드 경주 방법 (출발 전 6초 동안)
+function skHelpShow(t0) {
+  let el = $("#skHelp"); if (!el) { el = h("div", { id: "skHelp", class: "sk-help" }); document.body.append(el); }
+  el.replaceChildren(h("b", { text: "🏁 스피드 경주 방법" }),
+    h("div", { class: "sk-help-feet" }, h("span", { text: "⏪ 왼발" }), h("i", { text: "→" }), h("span", { text: "오른발 ⏩" }), h("i", { text: "→" }), h("span", { text: "⏪ 왼발" }), h("i", { text: "…" })),
+    h("p", { text: "두 버튼을 번갈아 탁·탁·탁 눌러요. 같은 발만 누르면 거의 안 나가고, 안 누르면 점점 느려져요." }),
+    h("p", { class: "muted", text: `${RACE_LAPS}바퀴를 먼저 돌면 이겨요 · 키보드 ← → (A D)도 돼요` }),
+    h("div", { class: "sk-help-n", text: "" }));
+  el.hidden = false;
+  const n = el.querySelector(".sk-help-n");
+  clearInterval(SK.helpT);
+  SK.helpT = setInterval(() => { const left = Math.ceil((t0 - Date.now()) / 1000); if (left <= 0 || !SK.race) { clearInterval(SK.helpT); el.hidden = true; return; } n.textContent = left <= 3 ? String(left) : "준비…"; }, 100);
 }
 function renderSkateBar(force) {
   const bar = $("#skateBar"); if (!bar) return;
-  const ice = onIceMe(), R = SK.race;
-  if (!ice && !R) { if (!bar.hidden) bar.hidden = true; SK.barKey = ""; return; }
-  const key = R ? `r|${R.done ? "d" : Date.now() < R.t0 ? "w" : "go"}|${Math.floor(R.p * 20)}` : "f";
+  const ice = onIceMe(), R = SK.race, P = SK.prog && !SK.prog.done ? SK.prog : null, watch = !ice && !R && nearRinkMe();
+  if (!ice && !R && !watch) { if (!bar.hidden) bar.hidden = true; SK.barKey = ""; return; }
+  const perf = watch || (ice && !P) ? rinkPerformer() : null;
+  const key = R ? `r|${R.done ? "d" : Date.now() < R.t0 ? "w" : "go"}|${Math.floor(R.p * 20)}` : P ? `p|${P.els.length}` : watch ? `w|${perf ? perf.id + perf.fpr : ""}` : `f|${perf ? perf.id : ""}|${SK.best}`;
   const lap = R ? Math.min(RACE_LAPS, Math.floor(R.p) + 1) : 0, sec = R ? Math.max(0, ((R.done || Date.now()) - R.t0) / 1000) : 0;
-  const rt = R ? (R.done ? `🏁 결승 ${sec.toFixed(2)}초 · 다른 선수 기다리는 중…` : Date.now() < R.t0 ? "🏁 곧 출발해요!" : `⛸ ${lap}/${RACE_LAPS}바퀴 · ${sec.toFixed(1)}초`) : "";
+  const rt = R ? (R.done ? `🏁 결승 ${sec.toFixed(2)}초 · 다른 선수 기다리는 중…` : Date.now() < R.t0 ? "🏁 곧 출발해요! 왼발·오른발 번갈아" : `⛸ ${lap}/${RACE_LAPS}바퀴 · ${sec.toFixed(1)}초`) : "";
   if (!force && key === SK.barKey) { const t = R && bar.querySelector(".sb-t"); if (t && t.textContent !== rt) t.textContent = rt; return; }
   SK.barKey = key; bar.hidden = false;
+  const clapBtn = h("button", { class: "btn ghost sm", text: perf ? `👏 ${clip(perf.name, 6) || "친구"}님께 박수` : "👏 박수", onclick: skClap });
+  const rankBtn = h("button", { class: "btn ghost sm", text: "🏆 랭킹", onclick: () => openRinkRank() });
   if (R) {
     bar.replaceChildren(...[h("span", { class: "sb-t", text: rt }),
       h("div", { class: "sk-prog" }, h("i", { style: `width:${(R.p / RACE_LAPS) * 100}%` })),
@@ -4414,9 +4662,22 @@ function renderSkateBar(force) {
       R.done ? h("button", { class: "btn ghost sm", text: "끝내기", onclick: skEnd }) : null].filter(Boolean));
     return;
   }
-  bar.replaceChildren(h("span", { class: "sb-t", text: `⛸ 스케이트장${SK.best ? ` · 내 최고 ${SK.best.toFixed(1)}초` : ""}` }),
-    h("button", { class: "btn primary sm", text: "🏁 스피드 경주 시작", title: "지금 얼음 위에 있는 친구들과 같이 (최대 4명) · 혼자면 기록 재기", onclick: skStartRace }),
-    ...Object.entries(W.FIGURES).map(([k, F]) => h("button", { class: "btn ghost sm", text: F.name, onclick: () => skFigure(k) })));
+  if (P) {
+    bar.replaceChildren(h("span", { class: "sb-t", text: `🎵 ${P.song.name}` }), h("i", { class: "sk-beat", title: "박자 불빛 · 밝을 때 누르면 Perfect" }), h("span", { class: "sk-fb" }),
+      ...Object.entries(W.FIGURES).filter(([k, F]) => !F.hide && k !== "bow").map(([k, F]) => h("button", { class: "btn primary sm" + ((P.counts[k] || 0) >= 2 ? " used" : ""), text: F.name, title: `기본 ${FIG_EL[k]}점`, onclick: () => skFigure(k) })),
+      h("button", { class: "btn ghost sm", text: "🙇 인사로 마무리", onclick: () => skFigure("bow") }),
+      h("button", { class: "btn ghost sm", text: "그만", onclick: () => figAbort("연기를 멈췄어요") }));
+    return;
+  }
+  if (watch) {
+    bar.replaceChildren(h("span", { class: "sb-t", text: perf ? `👀 ${clip(perf.name, 8) || "친구"}님 연기 중 · 🎵 ${(FIG_SONGS.find((x) => x.id === perf.fpr) || {}).name || ""}` : "👀 스케이트장 구경 중 · 벤치에 앉거나 펜스에 기대 봐요" }), clapBtn, rankBtn);
+    return;
+  }
+  bar.replaceChildren(...[h("span", { class: "sb-t", text: `⛸ 스케이트장${SK.best ? ` · 내 최고 ${SK.best.toFixed(1)}초` : ""}` }),
+    h("button", { class: "btn primary sm", text: "🏁 스피드 경주", title: "지금 얼음 위에 있는 친구들과 같이 (최대 4명) · 혼자면 기록 재기", onclick: skStartRace }),
+    h("button", { class: "btn primary sm", text: "🩰 피겨 연기 (음악 고르기)", onclick: figOpen }), rankBtn, perf ? clapBtn : null,
+    h("span", { class: "sk-sep", text: "연습:" }),
+    ...Object.entries(W.FIGURES).filter(([k, F]) => !F.hide && k !== "bow").map(([k, F]) => h("button", { class: "btn ghost sm", text: F.name, onclick: () => skFigure(k) }))].filter(Boolean));
 }
 document.addEventListener("keydown", (e) => { if (!SK.race || e.repeat) return; if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") { e.preventDefault(); skPush("L"); } if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") { e.preventDefault(); skPush("R"); } });
 setInterval(() => { if (S.room === "yard") renderSkateBar(); else if (!$("#skateBar").hidden) $("#skateBar").hidden = true; }, 400);
@@ -4537,7 +4798,8 @@ W.init($("#viewport"), $("#overlay"), {
     if (a === "showroom") openShowroom();
     if (a === "buy:s" || a === "buy:l") openOrder(a.slice(4));
     if (a === "cookie") startCookie();
-    if (a === "rink") { if (onIceMe()) toast("⛸ 아래 막대에서 경주를 시작하거나 피겨 기술을 해 봐요!"); else goRink(); }
+    if (a === "rink") { if (onIceMe()) toast("⛸ 아래 막대에서 🏁 경주나 🩰 피겨 연기를 해 봐요!"); else goRink(); }
+    if (a === "rinkrank") openRinkRank();
     if (a.startsWith("pet:")) { const pi = W.petOf(a.slice(4)); if (pi && pi.i === 99) toast(`🦁 다니엘의 사자예요. 사자들의 입을 봉하셨어요 (다니엘 6:22)`); else if (pi) { W.petCat(pi.i); const c = W.CATS[pi.i]; toast(`🐱 ${c.name}${pi.owner ? `가 ${clip(pi.owner, 10)}님을` : "가 누군가를"} 졸졸 따라다녀요 💕`); } }
     if (a === "court:bb" || a === "ball:bb") bbGoToBall();
     if (a === "schedule") openSched();
