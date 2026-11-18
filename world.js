@@ -1536,11 +1536,40 @@ function buildBackyard(s, seats, obs, clickables, labels) {
     const x = Lc.x + dx, z = Lc.z + dz, [c1, c2] = matCols[mi];
     const mt = new T.Mesh(new T.PlaneGeometry(2.2, 1.6), new T.MeshStandardMaterial({ map: stripeTex(c1, c2), roughness: 0.9 })); mt.rotation.x = -Math.PI / 2; mt.position.set(x, 0.03, z); mt.receiveShadow = true; g.add(mt);
     const rot = Math.atan2(Lc.x - x, (Lc.z + 4.6) - z), ids = [];
-    for (const k of [-0.5, 0.5]) { const sid = `LS${mi}-${ids.length}`, c = Math.cos(rot), sn = Math.sin(rot), sx = x + k * c, sz = z - k * sn; seats[sid] = { x: sx, z: sz, rot, h: 0.36, ax: sx - Math.sin(rot) * 0.9, az: sz - Math.cos(rot) * 0.9, listen: true }; ids.push(sid); }
+    for (const k of [-0.5, 0.5]) { const sid = `LS${mi}-${ids.length}`, c = Math.cos(rot), sn = Math.sin(rot), sx = x + k * c, sz = z - k * sn; seats[sid] = { x: sx, z: sz, rot, h: 0.36, ax: sx - Math.sin(rot) * 0.9, az: sz - Math.cos(rot) * 0.9, listen: true, mat: true }; ids.push(sid); }
     mt.userData.seats = ids; clickables.push(mt);
   });
-  for (let k = 0; k <= 12; k++) { const a = Math.PI * 1.1 + (k / 12) * Math.PI * 0.8; const x = Lc.x + Math.cos(a) * 6.4, z = Lc.z + Math.sin(a) * 5.4 + 0.6; if (k % 4 === 0) { cyl(g, 0.04, 0.05, 2.6, M("#3a3a3a", 0.5), x, 1.3, z, 6); obs.push([x - 0.1, z - 0.1, x + 0.1, z + 0.1]); } }
-  { const twk2 = []; const run = []; for (let k = 0; k <= 12; k += 4) { const a = Math.PI * 1.1 + (k / 12) * Math.PI * 0.8; run.push([Lc.x + Math.cos(a) * 6.4, 2.6, Lc.z + Math.sin(a) * 5.4 + 0.6]); } lightRun(g, twk2, run, 10, 0.25); }
+  // 🏕 돗자리 뒤 캠핑 의자 5개 (안내판을 봐요) — 자리 CC-0~4
+  const campCols = ["#2f4f8a", "#3f7a45", "#c0392b", "#e8862f", "#6b4a8a"], bdZ = Lc.z + 4.6;
+  [-4.2, -2.1, 0, 2.1, 4.2].forEach((dx, i) => {
+    const x = Lc.x + dx, z = Lc.z - 3.5 - Math.abs(dx) * 0.12, rot = Math.atan2(Lc.x - x, bdZ - z), id = "CC-" + i;
+    const ch = new T.Group(); ch.position.set(x, 0, z); ch.rotation.y = rot; g.add(ch);
+    const fr = M("#2b2b2b", 0.4), fab = M(campCols[i], 0.85);
+    for (const sx of [-0.26, 0.26]) { const l1 = cyl(ch, 0.015, 0.015, 0.62, fr, sx, 0.26, 0, 6); l1.rotation.x = 0.55; const l2 = cyl(ch, 0.015, 0.015, 0.62, fr, sx, 0.26, 0, 6); l2.rotation.x = -0.55; }
+    const seat = box(ch, 0.52, 0.04, 0.46, fab, 0, 0.42, 0); seat.rotation.x = -0.06;
+    const back = box(ch, 0.52, 0.5, 0.04, fab, 0, 0.7, -0.24); back.rotation.x = -0.22;
+    for (const sx of [-0.29, 0.29]) { box(ch, 0.05, 0.03, 0.4, fr, sx, 0.6, 0); cyl(ch, 0.012, 0.012, 0.2, fr, sx, 0.5, 0.18, 6); }
+    const cup = cyl(ch, 0.045, 0.04, 0.07, fab, 0.34, 0.6, 0.15, 10); void cup;
+    seats[id] = { x, z, rot, h: 0.44, ax: x + Math.sin(rot) * 0.7, az: z + Math.cos(rot) * 0.7 };
+    seatGroupMark(ch, [id]); clickables.push(ch); obs.push([x - 0.3, z - 0.3, x + 0.3, z + 0.3]);
+  });
+  // ✨ 알전구 지붕: 안내판 위에서 잔디밭 뒤쪽 기둥까지 촘촘하게 (밤에 빛나요)
+  const lTw = [], warm = ["#fff2c4", "#ffe08a", "#ffd36a", "#fff8e0"], wireM = new T.LineBasicMaterial({ color: "#2a2a24" });
+  const backPts = [];
+  for (let k = 0; k < 7; k++) {
+    const u = k / 6, a = Math.PI * 1.08 + u * Math.PI * 0.84, x = Lc.x + Math.cos(a) * 6.3, z = Lc.z + Math.sin(a) * 5.2 - 0.2;
+    cyl(g, 0.045, 0.055, 3.1, M("#3a3a3a", 0.5), x, 1.55, z, 6); obs.push([x - 0.1, z - 0.1, x + 0.1, z + 0.1]);
+    const cap = new T.Mesh(new T.SphereGeometry(0.07, 8, 6), M("#ffe9a8", 0.4, { emissive: "#ffd36a", emissiveIntensity: 0.8 })); cap.position.set(x, 3.12, z); g.add(cap);
+    backPts.push([x, 3.05, z]);
+  }
+  const frontPts = []; for (let k = 0; k < 7; k++) frontPts.push([Lc.x - 2.1 + (k / 6) * 4.2, 3.48, bdZ - 0.05]);
+  const strand = (A, B, n, sag) => {
+    const pts = []; for (let i = 0; i <= n; i++) { const t = i / n; pts.push([A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t - Math.sin(Math.PI * t) * sag, A[2] + (B[2] - A[2]) * t]); }
+    g.add(new T.Line(new T.BufferGeometry().setFromPoints(pts.map((q) => new T.Vector3(...q))), wireM)); bulbs(g, pts.slice(1, -1), lTw, 0.034, warm);
+  };
+  for (let k = 0; k < 7; k++) strand(frontPts[k], backPts[k], 26, 0.5);                       // 앞(안내판) → 뒤(기둥)
+  for (let k = 0; k < 6; k++) { strand(frontPts[k], backPts[k + 1], 26, 0.55); strand(backPts[k], backPts[k + 1], 9, 0.25); } // 엇갈려서 촘촘하게 + 뒤쪽 이어 주기
+  strand(frontPts[0], frontPts[6], 12, 0.05);                                                 // 안내판 위 가로줄
   // 가로등 · 덤불
   for (const u of [0.06, 0.24, 0.42, 0.6, 0.78, 0.95]) { const p = WALK.at(u), x = p.x + p.tz * 1.7, z = p.z - p.tx * 1.7;
     cyl(g, 0.06, 0.08, 2.8, M("#2e3135", 0.5), x, 1.4, z, 8); const bulb = new T.Mesh(new T.SphereGeometry(0.18, 10, 8), M("#fff4d0", 0.4, { emissive: "#ffe9a8", emissiveIntensity: 0.9 })); bulb.position.set(x, 2.9, z); g.add(bulb); obs.push([x - 0.18, z - 0.18, x + 0.18, z + 0.18]); }
@@ -1584,7 +1613,7 @@ function buildBackyard(s, seats, obs, clickables, labels) {
     for (let k = ripples.length - 1; k >= 0; k--) { const R = ripples[k], e = (now - R.t0) / 1000, life = R.big ? 2.2 : 1.4; if (e > life) { g.remove(R.m); R.m.geometry.dispose(); R.m.material.dispose(); ripples.splice(k, 1); continue; } const sc = 1 + e * (R.big ? 7 : 5); R.m.scale.set(sc, sc, 1); R.m.material.opacity = 0.7 * (1 - e / life); }
   };
   const upd0 = update;
-  return { signs, update: (dt, t) => { upd0(dt, t); skipFrame(dt); }, verses: null, done: -1, listenMat, skip };
+  return { signs, update: (dt, t) => { upd0(dt, t); skipFrame(dt); }, verses: null, done: -1, listenMat, skip, tw: lTw };
 }
 
 /* ---------------- 게시판 그림 (모임 시간표 · 운동장 랭킹) ---------------- */
@@ -2370,7 +2399,7 @@ function buildYard() {
   const initCats = (grid) => { catGrid = grid; pts = catPts.filter(([x, z]) => grid.free(x, z)); };
 
   const courts = buildCourts(s, seats, obs, clickables, labels);
-  const backyard = buildBackyard(s, seats, obs, clickables, labels);
+  const backyard = buildBackyard(s, seats, obs, clickables, labels); twk.push(...(backyard.tw || []));
   return { scene: s, seats, obs, clickables, doors, labels, tw: twk, trucks, cats, swings, courts, backyard, schedBoard, showroom, rink, sportBoard: courts.sportBoard, initCats, catState: state, feedMat, feedSpot: { x: CX + 2.0, z: CZ + 3.6 },
     update: (dt, t) => { if (snowOn() && !World.lite) snowFx(dt, t); updateCats(dt, t); updateRoadCars(cars, dt); updateTruckNpcs(trucks, dt, t); showroom.update(t); backyard.update(dt, t); }, night, bounds: { x0: -36, x1: 54, z0: -44.5, z1: 13.3 }, cell: 0.3, pad: 0.24,
     cam: { pitch: 0.66, dist: 15, min: 6, max: 26, yawLimit: 1.6 },
@@ -3456,7 +3485,7 @@ function buildPraise() {
 // 누운 자세 회전: 몸(위쪽) → 소파 길이 방향, 얼굴(앞쪽) → 하늘
 const LIE_Q = new T.Quaternion().setFromRotationMatrix(new T.Matrix4().makeBasis(new T.Vector3(0, 0, 1), new T.Vector3(1, 0, 0), new T.Vector3(0, 1, 0)));
 const World = {
-  ver: "2026-11-18k", // 🔖 app.js의 WORLD_VER와 같아야 해요 (다르면 화면 위에 '파일이 덜 올라갔어요' 안내)
+  ver: "2026-11-18l", // 🔖 app.js의 WORLD_VER와 같아야 해요 (다르면 화면 위에 '파일이 덜 올라갔어요' 안내)
   LOOK, safeLook, makeCharacter, poseCharacter,
   renderer: null, camera: null, rooms: {}, room: null, roomName: null,
   actors: new Map(), hooks: null, el: null, overlay: null,
@@ -3888,6 +3917,33 @@ const World = {
       else { const q = 1 - (e - 1.9) / 0.5; a.outer.rotation.y = a.yaw + Math.PI * 3; g.position.y = -0.3 * q; g.rotation.x = -0.35 * q; L.rotation.set(-1.45 * q, 0, 0); R.rotation.set(-1.45 * q, 0, 0); }
     } else if (k === "bow") { a.outer.rotation.y = a.yaw; g.rotation.x = 0.6 * Math.sin(Math.min(1, u) * Math.PI); AL.rotation.set(0, 0, 0.9); AR.rotation.set(-0.5, 0, -0.2); R.rotation.set(0.3, 0, 0); }
     void turn; void t;
+  },
+  /* 🧺 돗자리 자세: 앉기(양반다리) · 엎드리기 · 서기 · 눕기 — 내 상태 matPose */
+  isMat(seat) { return !!(this.room && seat && this.room.seats[seat] && this.room.seats[seat].mat); },
+  matPose(a, seated, t) {
+    const on = seated && seated.mat, g = a.ch.group, c = a.ch;
+    if (!on) { if (a.matPosed) { a.matPosed = false; g.rotation.set(0, 0, 0); g.position.set(0, 0, 0); } return; }
+    a.matPosed = true;
+    const k = a.data.matPose || "sit";
+    g.rotation.set(0, 0, 0); g.position.set(0, 0, 0);
+    if (k === "stand") { a.outer.position.y = 0.02; c.legL.rotation.set(0, 0, 0); c.legR.rotation.set(0, 0, 0); c.armL.rotation.set(0, 0, 0.18); c.armR.rotation.set(0, 0, -0.18); c.head.rotation.x = 0; }
+    else if (k === "sit") { // 양반다리로 바닥에 앉기
+      a.outer.position.y = -0.26;
+      c.legL.rotation.set(-1.45, 0, 0.42); c.legR.rotation.set(-1.45, 0, -0.42);
+      c.armL.rotation.set(-0.55, 0, 0.3); c.armR.rotation.set(-0.55, 0, -0.3); c.head.rotation.x = -0.05;
+    } else if (k === "prone") { // 엎드려서 턱 괴고 발 까딱까딱
+      a.outer.position.y = 0;
+      g.rotation.x = 1.5; g.position.set(0, 0.17, -0.55);
+      c.armL.rotation.set(-2.5, 0, -0.35); c.armR.rotation.set(-2.5, 0, 0.35); c.head.rotation.x = -0.75;
+      c.legL.rotation.x = 0.55 + Math.sin(t * 2.2) * 0.35; c.legR.rotation.x = 0.55 - Math.sin(t * 2.2) * 0.35;
+    } else if (k === "lie") { // 하늘 보고 눕기, 두 손은 머리 뒤
+      a.outer.position.y = 0;
+      g.rotation.x = -1.5; g.position.set(0, 0.16, 0.55);
+      c.armL.rotation.set(-2.75, 0, 0.6); c.armR.rotation.set(-2.75, 0, -0.6); c.head.rotation.x = 0.1;
+      c.legL.rotation.x = 0; c.legR.rotation.x = -0.4;
+      c.eyesOpen.visible = false; c.eyesClosed.visible = true;
+    }
+    a.lyingNow = k === "prone" || k === "lie";
   },
   /* 🤪 장난: poke(어깨 툭 맞음) · push(툭 치는 쪽) · trip(다리 걸려 넘어짐) · sweep(다리 거는 쪽) */
   prank(id, k) { const a = this.actors && this.actors.get ? this.actors.get(id) : null; if (a) a.prank = { k, t0: performance.now() }; },
@@ -4373,6 +4429,7 @@ const World = {
       this.jamPose(a, seated, walking, t);
       this.dancePose(a, seated, walking, t);
       this.skatePose(a, seated, walking, t, nowMs);
+      this.matPose(a, seated, t);
       // 🙌 펜스에 기대기: 몸을 살짝 숙이고 두 팔을 펜스 위에
       const leanNow = !!(seated && seated.lean);
       if (leanNow) { a.ch.group.rotation.x = 0.3; a.ch.armL.rotation.set(-1.35, 0, 0.3); a.ch.armR.rotation.set(-1.35, 0, -0.3); a.leaning = true; }

@@ -1074,3 +1074,4 @@ body.jamming #composer-praise { display: none; }
 .habit-grid { max-width: 360px; margin: 12px auto; }
 .ver-warn { position: fixed; left: 0; right: 0; top: 0; z-index: 9999; background: #d9483b; color: #fff; font-weight: 700; padding: 10px 14px; text-align: center; font-size: 14px; }
 .roast-bar.skip-bar { background: linear-gradient(90deg, #cfe3ef 0%, #cfe3ef 62%, #6fae55 62%, #6fae55 78%, #cfe3ef 78%); }
+.listen-bar { bottom: 64px; background: rgba(46,42,80,.94); }

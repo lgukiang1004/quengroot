@@ -6,7 +6,7 @@ const VERSES = window.VERSES || [];
 const BOOKS = window.BOOKS || [];
 const W = window.World;
 // 🔖 world.js가 같이 올라갔는지 확인 (깃허브에 app.js만 올라가고 world.js가 옛날 것이면 지도·뒷마당이 안 바뀌어요)
-const WORLD_VER = "2026-11-18k";
+const WORLD_VER = "2026-11-18l";
 if (!W || W.ver !== WORLD_VER) setTimeout(() => { const b = document.createElement("div"); b.className = "ver-warn"; b.textContent = `⚠️ 사이트 파일이 덜 올라갔어요: world.js가 옛날 버전이에요 (지금 ${W && W.ver ? W.ver : "옛날 것"} · 필요한 것 ${WORLD_VER}). 깃허브에 world.js를 다시 올려 주세요.`; document.body.append(b); }, 1500);
 const LIMIT = { bubble: 80, status: 60, wall: 200, name: 12 };
 // 코드 안의 방 이름: yard = 마당, worship = 본당(기도하는 공간), cafe = 성경 읽는 공간, vision = 비전, room301 = 301호, praise = 찬양팀 연습실(리빙리버)
@@ -863,6 +863,7 @@ function meState() {
     skr: S.room === "yard" && typeof SK !== "undefined" ? skState() : null, // ⛸ 경주 중
     fig: S.room === "yard" && S.fig ? S.fig : null,                         // ⛸ 피겨 기술
     fpr: S.room === "yard" && typeof SK !== "undefined" && SK.prog && !SK.prog.done ? SK.prog.song.id : null, // 🩰 피겨 연기 중인 곡
+    matPose: S.room === "yard" && S.seat && W.isMat && W.isMat(S.seat) ? S.matPose || "sit" : null, // 🧺 돗자리 자세
     study: S.room === "room301" && S.study ? S.study.t0 : null, // 📚 같이 공부 중
     bal: S.room === "room301" ? S.bal || null : null, balPick: S.room === "room301" ? S.balPick || null : null, // ⚖️ 밸런스 게임
     liar: S.room === "room301" ? S.liar || null : null, lvote: S.room === "room301" ? S.lvote || null : null,   // 🕵️ 라이어 게임
@@ -5536,6 +5537,18 @@ function openPlanView() {
 // 하루 분량을 다 읽으면 미션 기록
 function planTick() { const st = planState(); if (!st) return; const p = st.days[Math.min(st.dayN, st.days.length - 1)]; if (p && st.isDone(p)) mAdd("plan"); renderPlanCard(); }
 setInterval(() => { if (started && S.room === "cafe") planTick(); }, 10e3);
+
+/* ================= 🧺 돗자리 자세 (청음회 잔디밭) ================= */
+const MAT_POSES = [["sit", "🧘 앉기"], ["prone", "🛌 엎드리기"], ["stand", "🧍 서기"], ["lie", "😴 눕기"]];
+function renderMatBar() {
+  const bar = $("#matBar"); if (!bar) return;
+  const on = S.room === "yard" && S.seat && W.isMat && W.isMat(S.seat);
+  if (!on) { if (S.matPose && S.matPose !== "sit") S.matPose = "sit"; if (!bar.hidden) bar.hidden = true; bar.dataset.k = ""; return; }
+  const cur = S.matPose || "sit", k = "m" + cur; if (bar.dataset.k === k) return; bar.dataset.k = k; bar.hidden = false;
+  bar.replaceChildren(h("span", { class: "sb-t", text: "🧺 돗자리" }), ...MAT_POSES.map(([id, label]) => h("button", { class: "btn sm " + (cur === id ? "primary" : "ghost"), text: label, onclick: () => { S.matPose = id; refreshMe(); renderMatBar(); } })),
+    h("button", { class: "btn ghost sm", text: "일어나기", onclick: () => W.stand() }));
+}
+setInterval(renderMatBar, 300);
 
 /* ================= 🪨 물수제비 (호숫가에서) ================= */
 // 던지기를 누르면 힘 막대가 오르내려요 → 초록 칸(딱 좋은 힘)에서 놓으면 많이 튀어요. 모두의 화면에 같은 돌이 튀어요.
