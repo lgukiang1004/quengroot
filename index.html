@@ -199,6 +199,8 @@
   </div>
   <div class="sport-bar" id="sportBar" hidden></div>
   <div class="sport-bar skate-bar" id="skateBar" hidden></div>
+  <div class="sport-bar fire-bar" id="fireBar" hidden></div>
+  <div class="walk-card" id="walkCard" hidden></div>
   <!-- 🎸 연주판 (악기 자리에 서면 나와요) -->
   <div class="jam-bar" id="jamBar" hidden></div>
   <!-- 💿 친구가 튼 CD 같이 듣기 -->
@@ -514,10 +516,10 @@
 <!-- 🏆 운동장 랭킹 -->
 <div class="modal" id="sportRankModal" hidden>
   <div class="modal-card">
-    <div class="drawer-head"><h2>🏆 운동장 랭킹</h2><button class="icon-btn" data-close="sportRankModal">✕</button></div>
+    <div class="drawer-head"><h2>🏆 농구 랭킹</h2><button class="icon-btn" data-close="sportRankModal">✕</button></div>
     <div class="seg small"><button class="seg-btn active" data-sper="week">이번 주</button><button class="seg-btn" data-sper="all">전체</button></div>
     <ol class="qz-rank" id="sportRankList"></ol>
-    <p class="muted tiny">🏀 골 2점(멀리서 3점) · 🎾🏸 같이 칠 때 우리 편 득점 1점 · 판 이기면 3점 · 농구 팀전 이기면 3점. 이번 주 랭킹은 월요일(뉴욕 시간)에 새로 시작해요.</p>
+    <p class="muted tiny">🏀 골 2점(멀리서 3점) · 농구 팀전 이기면 3점. 이번 주 랭킹은 월요일(뉴욕 시간)에 새로 시작해요.</p>
   </div>
 </div>
 
@@ -659,7 +661,7 @@
 <div class="modal" id="albumModal" hidden>
   <div class="modal-card wide-card">
     <div class="drawer-head"><h2>🌱 내 그루터기</h2><button class="icon-btn" data-close="albumModal">✕</button></div>
-    <div class="seg album-seg"><button class="seg-btn" data-atab="mission">🎯 미션</button><button class="seg-btn" data-atab="gift">🎁 선물·도감</button><button class="seg-btn" data-atab="skins">🎖 배지·스킨</button><button class="seg-btn" data-atab="record">📖 기록</button><button class="seg-btn" data-atab="card">📸 나의 그루터기 카드</button></div>
+    <div class="seg album-seg"><button class="seg-btn" data-atab="mission">🎯 미션</button><button class="seg-btn" data-atab="gift">🎁 선물·도감</button><button class="seg-btn" data-atab="skins">🎖 배지·스킨</button><button class="seg-btn" data-atab="record">📖 기록</button><button class="seg-btn" data-atab="walk">🌿 산책 노트</button><button class="seg-btn" data-atab="card">📸 나의 그루터기 카드</button></div>
     <div id="albumBody" class="album-body"></div>
   </div>
 </div>
@@ -771,9 +773,24 @@
       </div>
     </div>
     <button class="btn primary wide" id="enterBtn">들어가기</button>
+    <div class="entry-extra"><button class="btn ghost sm" id="linkBtn">📱 다른 기기와 연결</button><button class="btn ghost sm" id="tourAgainBtn" hidden>❓ 사용 안내 다시 보기</button></div>
   </div>
 </div>
 
+<!-- 🌿 말씀 산책길: 끝에 오늘의 질문 -->
+<div class="modal" id="walkModal" hidden>
+  <div class="modal-card">
+    <div class="drawer-head"><h2>🌿 오늘의 질문</h2><button class="icon-btn" data-close="walkModal">✕</button></div>
+    <div id="walkBody"></div>
+  </div>
+</div>
+<!-- 📱 기기 연결 -->
+<div class="modal" id="linkModal" hidden>
+  <div class="modal-card">
+    <div class="drawer-head"><h2>📱 다른 기기와 연결</h2><button class="icon-btn" data-close="linkModal">✕</button></div>
+    <div id="linkBody"></div>
+  </div>
+</div>
 <!-- 신고 -->
 <div class="modal" id="reportModal" hidden>
   <div class="modal-card">
@@ -823,6 +840,7 @@
     </div>
     <div id="adminPanel" hidden>
       <p class="admin-who" id="adminWho"></p>
+      <div class="adm-sec" data-roles="all"><div id="adminSummary"></div></div>
       <div class="adm-sec" data-roles="all">
       <h3>🔑 비밀번호 관리</h3>
       <p class="muted tiny">청년 1부 관리자: 1부 공지 · 301호(3Q) 퀴즈 · 1부 함께 성경 읽기만 · 찬양팀: 곡 악보만 관리할 수 있어요. 새 비밀번호를 적고 저장하면 바로 바뀌어요.</p>
@@ -832,7 +850,7 @@
       <div class="admin-form">
         <input id="evTitle" maxlength="60" placeholder="모임 이름 (예: 301호 보드게임 번개 🎲)">
         <div class="composer-row small">
-          <select id="evPlace"><option value="yard">🏡 마당</option><option value="worship">🙏 본당</option><option value="cafe">📖 성경 읽는 공간</option><option value="vision">🕊 비전 (2부)</option><option value="room301">🛋 301호 · 3Q (1부)</option><option value="praise">🎸 찬양팀 연습실</option><option value="court">⛹️ 운동장</option></select>
+          <select id="evPlace"><option value="yard">🏡 마당</option><option value="worship">🙏 본당</option><option value="cafe">📖 성경 읽는 공간</option><option value="vision">🕊 비전 (2부)</option><option value="room301">🛋 301호 · 3Q (1부)</option><option value="praise">🎸 찬양팀 연습실</option><option value="court">🏀 농구장</option></select>
           <input type="datetime-local" id="evStart">
           <select id="evLen"><option value="60">1시간</option><option value="120" selected>2시간</option><option value="180">3시간</option><option value="300">5시간</option></select>
         </div>

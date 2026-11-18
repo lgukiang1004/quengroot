@@ -181,7 +181,7 @@ class DemoBackend {
     this.leaveRoom();
     this.hd = hd; this.me = { ...me };
     const now = Date.now();
-    this.bots = DEMO_BOTS[room].map((b, i) => ({ ...b, id: `bot-${room}-${i}`, joinedAt: now - 100000 * (5 - i), amens: Math.floor(Math.random() * 4) }));
+    this.bots = /[?&]nobots/.test(location.search) ? [] : DEMO_BOTS[room].map((b, i) => ({ ...b, id: `bot-${room}-${i}`, joinedAt: now - 100000 * (5 - i), amens: Math.floor(Math.random() * 4) }));
     setTimeout(() => { this.emit(); hd.onStatus && hd.onStatus("ok"); }, 60);
     // 데모 모드에서도 같은 컴퓨터의 다른 탭끼리는 서로 보이고 같이 놀 수 있어요 (운동장 시험용)
     this.tabs = new Map();
@@ -210,6 +210,7 @@ class DemoBackend {
     let n = 0;
     this.walker = setInterval(() => {
       const b = this.bots[this.bots.length - 1], sp = DEMO_WALK[room][n++ % DEMO_WALK[room].length];
+      if (!b) return; // (?nobots 로 열면 가상 친구 없이 시험)
       if (sp.sled) { b.sled = { n: Date.now(), lane: 1 }; b.seat = null; b.pos = W.sledEnd(1); this.emit(); return; }
       b.seat = sp.seat || null; b.pos = sp.pos || null; b.praying = !!sp.praying;
       this.emit();
@@ -261,7 +262,7 @@ class DemoBackend {
   async adminSetSetting(pw, key, value) { this._admin(pw); const s = store.get("demo_settings", {}); s[key] = value; store.set("demo_settings", s); }
   _ev() { const saved = store.get("demo_events", null); if (saved) return saved; const t = Date.now(); return [
     { id: 2, title: "301호 보드게임 번개 🎲", place: "room301", memo: "", starts_at: new Date(t + 26 * 3600e3).toISOString(), ends_at: new Date(t + 28 * 3600e3).toISOString() },
-    { id: 1, title: "운동장 배드민턴 🏸", place: "court", memo: "", starts_at: new Date(t - 10 * 60e3).toISOString(), ends_at: new Date(t + 100 * 60e3).toISOString() }]; }
+    { id: 1, title: "농구 한 판 🏀", place: "court", memo: "", starts_at: new Date(t - 10 * 60e3).toISOString(), ends_at: new Date(t + 100 * 60e3).toISOString() }]; }
   async listEvents() { return this._ev().filter((e) => new Date(e.ends_at) > Date.now() - 3600e3).sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at)); }
   async adminAddEvent(pw, ev) { this._admin(pw); const l = this._ev(); l.push({ id: Math.max(0, ...l.map((x) => x.id)) + 1, ...ev }); store.set("demo_events", l); }
   async adminDeleteEvent(pw, id) { this._admin(pw); store.set("demo_events", this._ev().filter((x) => x.id !== id)); }
@@ -326,6 +327,14 @@ class DemoBackend {
   async missionMe() { return { log: [], books: [], resolve: null }; }
   // 🧀 쇼룸 · 주문 (데모)
   async cookieCount() { return store.get("demo_cookie", 128); }
+  // 🌿 산책 노트 (데모: 이 기기에만)
+  async walkNoteSave(q, a) { const l = store.get("demo_walk", []).filter((n) => n.day !== nyDay()); l.unshift({ day: nyDay(), q, a }); store.set("demo_walk", l.slice(0, 400)); return true; }
+  async walkNotes() { return store.get("demo_walk", []); }
+  // 📱 기기 연결 (데모: 같은 브라우저 안에서만 흉내)
+  async deviceCodeMake() { const code = String(100000 + Math.floor(Math.random() * 900000)); store.set("demo_link", { code, at: Date.now() }); return code; }
+  async deviceLink(code) { const d = store.get("demo_link", null); if (!d || d.code !== code || Date.now() - d.at > 600e3) throw new Error("코드가 맞지 않거나 10분이 지났어요"); return { token, name: S.profile?.name || "" }; }
+  async nameKnown() { return false; }
+  async adminSummary() { return { visitors7: 23, today: 6, prayers7: 41, reads7: 88, stamps7: 19, orders_new: 2, orders_week: 5, reports: 1, events_next: 2, members30: 37 }; }
   // ⛸ 스케이트장 랭킹 (데모: 이 기기에만 저장 + 가상 친구들)
   async rinkScoreAdd(kind, score, song) {
     const k = "demo_rink_" + kind, old = store.get(k, null), better = !old || (kind === "figure" ? score > old.score : score < old.score);
@@ -554,7 +563,7 @@ class SupaBackend {
     const { data, error } = await this.sb.rpc(fn, args);
     if (error) {
       // Supabase에 SQL이 아직 적용되지 않았을 때: 알아보기 쉬운 안내로 바꿔요
-      if (/schema cache|does not exist/i.test(error.message)) { console.warn(error.message); throw new Error(`아직 준비 중인 기능이에요. 관리자: Supabase에서 ${/^(mission_|cookie_|order_|admin_order|push_order|rink_)/.test(fn) ? "supabase-update-missions.sql" : /^(admin_role|admin_set_role_pw|notice_|quiz_set_books|quiz_reset|quiz_submit_g|quiz_ranking_g|challenge_add|challenge_delete|song_save|song_delete|song_clear_set|sheet_)/.test(fn) ? "supabase-update-groups.sql" : /song_rec/.test(fn) ? "supabase-update-praise.sql" : /quiz/.test(fn) ? "supabase-update-quiz.sql" : /setting|event|reading|challenge|testimon|sport|push/.test(fn) ? "supabase-update-community.sql" : "supabase-update-footprints.sql"}을 실행해 주세요`); }
+      if (/schema cache|does not exist/i.test(error.message)) { console.warn(error.message); throw new Error(`아직 준비 중인 기능이에요. 관리자: Supabase에서 ${/^(walk_note|cat_)/.test(fn) ? "supabase-update-yard.sql" : /^(device_|name_known|admin_summary)/.test(fn) ? "supabase-update-site.sql" : /^(mission_|cookie_|order_|admin_order|push_order|rink_)/.test(fn) ? "supabase-update-missions.sql" : /^(admin_role|admin_set_role_pw|notice_|quiz_set_books|quiz_reset|quiz_submit_g|quiz_ranking_g|challenge_add|challenge_delete|song_save|song_delete|song_clear_set|sheet_)/.test(fn) ? "supabase-update-groups.sql" : /song_rec/.test(fn) ? "supabase-update-praise.sql" : /quiz/.test(fn) ? "supabase-update-quiz.sql" : /setting|event|reading|challenge|testimon|sport|push/.test(fn) ? "supabase-update-community.sql" : "supabase-update-footprints.sql"}을 실행해 주세요`); }
       throw new Error(error.message);
     }
     return data;
@@ -697,6 +706,12 @@ class SupaBackend {
   // ---- 🎯 미션 · 🧀 쇼룸 · 🛒 주문 (supabase-update-missions.sql) ----
   missionAdd(kind, note) { return this._rpc("mission_add", { p_token: token, p_name: clip(S.profile?.name, LIMIT.name), p_kind: kind, p_note: note || null }); }
   missionMe() { return this._rpc("mission_me", { p_token: token }); }
+  walkNoteSave(q, a) { return this._rpc("walk_note_save", { p_token: token, p_q: q, p_a: a }); }
+  walkNotes() { return this._rpc("walk_notes_me", { p_token: token }); }
+  deviceCodeMake() { return this._rpc("device_code_make", { p_token: token }); }
+  deviceLink(code) { return this._rpc("device_link", { p_code: code, p_token: token }); }
+  nameKnown(name) { return this._rpc("name_known", { p_name: name, p_token: token }); }
+  adminSummary(pw) { return this._rpc("admin_summary", { p_pw: pw }); }
   rinkScoreAdd(kind, score, song) { return this._rpc("rink_score_add", { p_token: token, p_name: clip(S.profile?.name, LIMIT.name) || "", p_kind: kind, p_score: score, p_song: song || "" }); }
   rinkTop(kind) { return this._rpc("rink_top", { p_kind: kind, p_token: token }); }
   async cookieCount() { const { data, error } = await this.sb.from("showroom_counter").select("boxes").eq("id", 1).maybeSingle(); if (error) throw new Error(error.message); return data ? Number(data.boxes) : 0; }
@@ -710,6 +725,7 @@ class SupaBackend {
 }
 
 const useSupa = CFG.supabaseUrl && CFG.supabaseKey && window.supabase;
+const NEW_USER = !store.get("profile", null); // 이 기기에서 처음 들어온 사람 (안내 투어)
 const api = useSupa ? new SupaBackend(CFG.supabaseUrl, CFG.supabaseKey) : new DemoBackend();
 
 /* ================= 상태 ================= */
@@ -782,7 +798,7 @@ function refreshMe() {
 function renderOverlay(ov, p, mine) {
   const text = clip(p.bubble, LIMIT.bubble + 40);
   const reacted = S.reactedLive.has(p.id + "|" + text);
-  const key = [text, p.name, p.amens, reacted, mine, !!p.praying, S.room, p.badge, p.book, p.title].join("|");
+  const key = [text, p.name, p.amens, reacted, mine, !!p.praying, S.room, p.badge, p.book, p.title, !!p.catBoss].join("|");
   if (ov.dataset.key === key) return;
   ov.dataset.key = key;
   ov.classList.toggle("mine", mine);
@@ -798,7 +814,7 @@ function renderOverlay(ov, p, mine) {
       }, emo, h("span", { text: String(Math.max(0, Number(p.amens) || 0)) })))));
   }
   if (p.praying) ov.append(h("div", { class: "praying-tag", text: "🙏 기도중" }));
-  const tags = [typeof p.title === "string" && TITLE_TXT[p.title], p.book, p.badge].filter((x) => typeof x === "string" && x).map((x) => h("span", { class: "ntag", text: clip(x, 18) }));
+  const tags = [typeof p.title === "string" && TITLE_TXT[p.title], p.book, p.badge, p.catBoss && S.room === "yard" ? "👑🐱" : ""].filter((x) => typeof x === "string" && x).map((x) => h("span", { class: "ntag", text: clip(x, 18) }));
   ov.append(h("div", { class: "name" + (p.title === "tree" ? " gold" : "") }, name, ...tags));
 }
 function renderPeople() {
@@ -918,6 +934,7 @@ function joinRoom(room, from) {
   if (S.room === "yard" && room !== "yard" && BB.holder === myId) bbDrop(); // 공은 운동장에 두고 가요
   if (typeof SK !== "undefined" && SK.race) { SK.race = null; W.raceMe = null; W.keyBlock = false; clearInterval(SK.tick); }
   if (typeof SK !== "undefined" && SK.prog) figAbort();
+  if (room !== "yard" && typeof CW !== "undefined" && CW) catWalkEnd("🐾 실내로 들어가서 고양이가 콘도로 돌아갔어요");
   if (!$("#cookModal").hidden) closeModal("cookModal");
   if (!$("#cmGameModal").hidden) closeModal("cmGameModal");
   if (!$("#quizModal").hidden && !GB_ROOMS.includes(room)) closeModal("quizModal");
@@ -1392,33 +1409,135 @@ async function loadCatFeeds() {
   if (last && Date.now() - new Date(last.created_at).getTime() < 70000) W.catFeed(new Date(last.created_at).getTime());
   if (!$("#catModal").hidden) renderCatFood();
 }
-function renderCatFood() {
-  const today = catFeeds.filter((f) => isToday(f.created_at));
-  $("#catBody").replaceChildren(
-    h("div", { class: "cat-names" }, ...W.CATS.map((c) => h("span", { class: "chip", title: c.desc, text: `🐱 ${c.name} ${c.sex}` }))),
-    h("p", { class: "muted", text: `오늘 밥 ${today.length}번 받았어요. 골라서 주면 고양이들이 달려와서 먹어요 🐾` }),
-    h("div", { class: "shelf-list" }, ...Object.entries(CAT_FOOD).map(([k, [em, nm]]) => h("button", { class: "shelf-item", onclick: () => feedCats(k) }, h("span", { class: "em", text: em }), h("span", { text: nm })))),
-    h("div", { class: "board-label", style: "margin-top:12px", text: "🐾 최근에 밥 준 사람" }),
-    h("ul", { class: "recent-list" }, ...(catFeeds.length ? catFeeds.slice(0, 6).map((f) => h("li", {}, h("span", { class: "t", text: `${f.name || "익명"} · ${CAT_FOOD[f.kind] ? CAT_FOOD[f.kind].join(" ") : f.kind}` }), h("small", { text: timeAgo(f.created_at) })))
-      : [h("li", { class: "none", text: "아직 기록이 없어요." })])));
+// ---- 🐾 고양이 친밀도 · 성격 · 특식 · 30분 산책 (2026-11-18) ----
+// CATS 순서: 0 샤샤 · 1 까맹이 · 2 껌딱지 · 3 탐 · 4 브라우니
+const CAT_RULE = [
+  { need: 20, trait: "밥 많이 주는 사람을 잘 따라가요" },
+  { need: 60, pets: 30, trait: "독립적이에요. 밥도 많이, 쓰다듬기도 정성껏 해야 해요 · 산책 중에 가끔 혼자 딴 데 갔다 와요" },
+  { with: 0, trait: "샤샤 껌딱지예요. 샤샤를 데려가면 같이 따라와요" },
+  { need: 40, days: 3, trait: "낯을 가려요. 최근 7일 중 3일 이상 와서 밥을 줘야 마음을 열어요" },
+  { need: 50, days: 5, trait: "낯을 많이 가려요. 최근 7일 중 5일 이상 와서 밥을 줘야 해요" },
+];
+const TREATS = { salmon: { e: "🐟", name: "연어 큐브", fav: 0 }, catnip: { e: "🌿", name: "캣닢 쿠션", fav: 1 }, yarn: { e: "🧶", name: "털실 공", fav: 2 }, chicken: { e: "🍗", name: "닭가슴살", fav: 3 }, shrimp: { e: "🦐", name: "새우", fav: 4 } };
+const TREAT_KEYS = Object.keys(TREATS), CAT_WALK_MIN = 30, CAT_CAP_FROM = "2026-11-19"; // 이날부터 기본 밥은 하루 3번까지만 친밀도에 쳐요
+function catStats() {
+  const aff = [0, 0, 0, 0, 0], tN = dIdx(nyDay()); let pets = 0, days7 = 0;
+  for (const [d, day] of Object.entries(MS.log)) {
+    const feed = Number(day.catfeed || 0), base = d < CAT_CAP_FROM ? feed : Math.min(feed, 3);
+    for (let i = 0; i < 5; i++) aff[i] += base;
+    for (const k of TREAT_KEYS) { const n = Number(day["treat:" + k] || 0); if (!n) continue; for (let i = 0; i < 5; i++) aff[i] += n * (1 + (TREATS[k].fav === i ? 2 : 0)); }
+    pets += Number(day.catpet || 0);
+    if (feed && tN - dIdx(d) < 7) days7++;
+  }
+  return { aff, pets, days7 };
 }
-function openCatFood() { if (S.room !== "yard") return; renderCatFood(); openModal("catModal"); loadCatFeeds(); }
+// 고양이 i가 나를 따라오는지 + 진행도
+function catOpen(i, st = catStats()) { // true면 나를 따라와요
+  const R = CAT_RULE[i];
+  if (R.with != null) return catOpen(R.with, st);
+  return st.aff[i] >= R.need && (!R.pets || st.pets >= R.pets) && (!R.days || st.days7 >= R.days);
+}
+function catBoss(st = catStats()) { return [0, 1, 3, 4].every((i) => catOpen(i, st)); }
+// 🎒 간식 가방: 미션 도장(하루 1개) · 7일 연속 출석(2개)으로 받고, 준 만큼 빠져요
+function treatBag() {
+  const got = Object.fromEntries(TREAT_KEYS.map((k) => [k, 0])), used = { ...got };
+  const days = Object.keys(MS.log).sort(); let run = 0, prev = null;
+  for (const d of days) {
+    const day = MS.log[d];
+    if (day.stamp) got[TREAT_KEYS[hash2(dIdx(d) * 3 + 1, tokHash) % 5]]++;
+    if (day.visit) { run = prev != null && dIdx(d) - prev === 1 ? run + 1 : 1; prev = dIdx(d); if (run % 7 === 0) { got[TREAT_KEYS[hash2(dIdx(d) * 3 + 2, tokHash) % 5]]++; got[TREAT_KEYS[hash2(dIdx(d) * 3 + 3, tokHash) % 5]]++; } }
+    for (const k of TREAT_KEYS) used[k] += Number(day["treat:" + k] || 0);
+  }
+  return Object.fromEntries(TREAT_KEYS.map((k) => [k, Math.max(0, got[k] - used[k])]));
+}
+const treatsToday = () => TREAT_KEYS.reduce((a, k) => a + Number((MS.log[nyDay()] || {})["treat:" + k] || 0), 0);
+// 지금 산책 중 (내 기기): { cats: [번호], start, until }
+let CW = store.get("catWalk", null);
+function catWalkOn() { return !!(CW && Date.now() < CW.until && S.room === "yard"); }
+function catWalkLook() {
+  const on = catWalkOn() && Date.now() >= CW.start;
+  return { pet: on ? CW.cats[0] : -1, pets: on ? CW.cats : [], petAt: on ? CW.start : 0, catBoss: catBoss() };
+}
+function catWalkEnd(msg) { if (!CW) return; CW = null; store.set("catWalk", null); refreshMe(); if (msg) toast(msg); }
+// 다른 사람이 데리고 있는 고양이: { 번호: {name, at} }
+function catsBusy() {
+  const out = {};
+  for (const p of S.peers) if (p.id !== myId && Array.isArray(p.pets)) for (const k of p.pets) out[k] = { name: p.name || "친구", at: p.petAt || 0 };
+  return out;
+}
+// 같은 고양이를 두 사람이 데려가면 먼저 산책을 시작한 사람이 이겨요
+setInterval(() => {
+  if (!CW) return;
+  if (Date.now() >= CW.until) return catWalkEnd("🐾 산책 30분이 끝났어요. 고양이가 콘도로 돌아가요");
+  if (S.room !== "yard" || Date.now() < CW.start) return;
+  if (!CW.shown) { CW.shown = true; refreshMe(); toast(`🐾 ${CW.cats.map((k) => W.CATS[k].name).join(", ")}가 따라와요! (${CAT_WALK_MIN}분)`); }
+  const busy = catsBusy(), lost = CW.cats.filter((k) => busy[k] && (busy[k].at < CW.start || (busy[k].at === CW.start && false)));
+  if (lost.length) {
+    CW.cats = CW.cats.filter((k) => !lost.includes(k)); store.set("catWalk", CW);
+    toast(`🐾 ${lost.map((k) => W.CATS[k].name).join(", ")}는 먼저 ${clip(busy[lost[0]].name, 8)}님과 산책 중이었어요`);
+    if (!CW.cats.length) catWalkEnd(); else refreshMe();
+  }
+}, 2000);
+const hearts = (a, n) => { const k = Math.max(0, Math.min(5, Math.round((Math.min(a, n) / n) * 5))); return "💛".repeat(k) + "🤍".repeat(5 - k); };
+let catPick = new Set();
+function renderCatFood() {
+  const today = catFeeds.filter((f) => isToday(f.created_at)), st = catStats(), boss = catBoss(st), busy = catsBusy(), bag = treatBag(), tt = treatsToday();
+  const cards = W.CATS.map((c, i) => {
+    const R = CAT_RULE[i], open = catOpen(i, st), mine = CW && CW.cats.includes(i) && Date.now() < CW.until;
+    const b = busy[i], can = (open || (boss && i === 2)) && !b;
+    const prog = R.with != null ? (boss ? "👑 대장이라 혼자도 따라와요" : `샤샤와 같이 와요`) :
+      [`밥·특식 ${Math.min(st.aff[i], R.need)}/${R.need}`, R.pets ? `쓰다듬기 ${Math.min(st.pets, R.pets)}/${R.pets}` : "", R.days ? `이번 주 ${Math.min(st.days7, R.days)}/${R.days}일` : ""].filter(Boolean).join(" · ");
+    const sel = catPick.has(i);
+    return h("button", { class: "cat-card" + (sel ? " sel" : "") + (can ? "" : " lock"), disabled: !can || null, onclick: () => {
+      if (!boss) { const keep = sel; catPick.clear(); if (!keep) { catPick.add(i); if (i === 0) catPick.add(2); } } else { sel ? catPick.delete(i) : catPick.add(i); }
+      renderCatFood(); } },
+      h("b", { text: `${sel ? "☑ " : ""}🐱 ${c.name} ${c.sex}` }),
+      h("span", { class: "hearts", text: R.with != null ? "" : hearts(st.aff[i], R.need) }),
+      h("small", { text: mine ? "🐾 나와 산책 중" : b ? `🐾 ${clip(b.name, 8)}님과 산책 중` : open || (boss && i === 2) ? "✓ 같이 갈 수 있어요" : prog }),
+      h("small", { class: "trait", text: R.trait }));
+  });
+  const feedBtn = (k, em, nm, cnt, treat) => h("button", { class: "shelf-item" + (treat && !cnt ? " empty" : ""), disabled: (treat && (!cnt || tt >= 2)) || null, onclick: () => feedCats(k) },
+    h("span", { class: "em", text: em }), h("span", { text: nm }), treat ? h("small", { class: "cnt", text: `${cnt}개` + (TREATS[k] ? ` · ${W.CATS[TREATS[k].fav].name}가 좋아해요` : "") }) : null);
+  $("#catBody").replaceChildren(...[
+    h("p", { class: "muted", text: `오늘 밥 ${today.length}번 받았어요. 밥을 주면 고양이들이 달려와서 먹고, 고른 고양이와 ${CAT_WALK_MIN}분 산책해요 🐾` }),
+    boss ? h("p", { class: "cat-boss", text: "👑 고양이 대장! 산책할 고양이를 원하는 만큼 골라요" }) : null,
+    h("div", { class: "board-label", text: `🐾 같이 산책할 고양이 ${boss ? "(여러 마리 가능)" : "(한 마리 · 샤샤는 껌딱지와 함께)"}` }),
+    h("div", { class: "cat-cards" }, ...cards),
+    CW && Date.now() < CW.until ? h("p", { class: "muted tiny", text: `지금 ${CW.cats.map((k) => W.CATS[k].name).join(", ")}와 산책 중 · ${Math.max(1, Math.ceil((CW.until - Date.now()) / 60000))}분 남았어요` }) : null,
+    h("div", { class: "board-label", text: "🥣 기본 밥 (모두 +1 · 하루 3번까지 쳐요)" }),
+    h("div", { class: "shelf-list" }, ...Object.entries(CAT_FOOD).map(([k, [em, nm]]) => feedBtn(k, em, nm, 0, false))),
+    h("div", { class: "board-label", text: `🎒 특식 (모두 +2 · 좋아하는 고양이 +4 · 하루 2개까지, 오늘 ${tt}/2)` }),
+    h("div", { class: "shelf-list" }, ...TREAT_KEYS.map((k) => feedBtn(k, TREATS[k].e, TREATS[k].name, bag[k], true))),
+    h("p", { class: "muted tiny", text: "특식은 오늘의 미션 3개를 다 하면 1개, 7일 연속으로 오면 2개 받아요. 고양이를 누르면 쓰다듬기(하루 10번)도 돼요." }),
+    h("div", { class: "board-label", style: "margin-top:12px", text: "🐾 최근에 밥 준 사람" }),
+    h("ul", { class: "recent-list" }, ...(catFeeds.length ? catFeeds.slice(0, 6).map((f) => { const fd = CAT_FOOD[f.kind] || (TREATS[f.kind] ? [TREATS[f.kind].e, TREATS[f.kind].name] : null); return h("li", {}, h("span", { class: "t", text: `${f.name || "익명"} · ${fd ? fd.join(" ") : f.kind}` }), h("small", { text: timeAgo(f.created_at) })); })
+      : [h("li", { class: "none", text: "아직 기록이 없어요." })]))].filter(Boolean));
+}
+function openCatFood() { if (S.room !== "yard") return; catPick = new Set(CW && Date.now() < CW.until ? CW.cats : []); renderCatFood(); openModal("catModal"); loadCatFeeds(); }
 async function feedCats(kind) {
-  const name = clip(S.profile?.name, LIMIT.name), [em, nm] = CAT_FOOD[kind];
+  const name = clip(S.profile?.name, LIMIT.name), treat = TREATS[kind], [em, nm] = treat ? [treat.e, treat.name] : CAT_FOOD[kind];
+  if (treat && (treatBag()[kind] < 1 || treatsToday() >= 2)) return toast("🎒 특식은 하루 2개까지예요");
   try { await api.feedCat(kind, name); } catch (e) { toast(e.message); return; }
-  closeModal("catModal"); mAdd("catfeed");
+  closeModal("catModal"); mAdd("catfeed"); if (treat) mAdd("treat:" + kind);
   const spot = W.catFeedSpot(); if (spot) W.moveMe({ x: spot.x, z: spot.z });
   W.catFeed(Date.now());
   api.sendCatFeed(name || "익명", kind);
-  S.bubble = `${em} 고양이들 ${eul(nm)} 주는 중 🐾`; S.kind = "status"; S.amens = 0; refreshMe();
-  toast(`${em} ${eul(nm)} 줬어요! 고양이들이 달려와요 🐾`);
+  S.bubble = `${em} 고양이들 ${eul(nm)} 주는 중 🐾`; S.kind = "status"; S.amens = 0;
+  // 🐾 고른 고양이와 산책: 밥을 다 먹으면(70초) 30분 동안 따라와요
+  const busy = catsBusy(), boss = catBoss(), picks = [...catPick].filter((k) => !busy[k] && (CAT_RULE[k].with != null ? catOpen(0) || boss : catOpen(k))).slice(0, boss ? 5 : 2);
+  if (picks.length) { const start = Date.now() + 70000; CW = { cats: picks, start, until: start + CAT_WALK_MIN * 60000 }; store.set("catWalk", CW); }
+  refreshMe();
+  if (treat) { const fv = W.CATS[treat.fav]; toast(`${em} ${eul(nm)} 줬어요! ${fv.name}가 엄청 좋아해요 💕 (${fv.name} +4 · 모두 +2)`); }
+  else toast(`${em} ${eul(nm)} 줬어요! 고양이들이 달려와요 🐾`);
+  if (picks.length) setTimeout(() => toast(`🐾 다 먹으면 ${picks.map((k) => W.CATS[k].name).join(", ")}가 ${CAT_WALK_MIN}분 동안 따라와요`), 2200);
   loadCatFeeds();
 }
 function onCatFeed({ name, kind }) {
   W.catFeed(Date.now());
-  const f = CAT_FOOD[kind]; if (f) toast(`🐾 ${clip(name, 10) || "익명"}님이 고양이들에게 ${f[0]} ${eul(f[1])} 줬어요`);
+  const f = CAT_FOOD[kind] || (TREATS[kind] ? [TREATS[kind].e, TREATS[kind].name] : null); if (f) toast(`🐾 ${clip(name, 10) || "익명"}님이 고양이들에게 ${f[0]} ${eul(f[1])} 줬어요`);
   setTimeout(loadCatFeeds, 1500);
 }
+function catPetted(i) { if (mAdd("catpet")) { const st = catStats(); if (i === 1 && st.pets <= CAT_RULE[1].pets) toast(`💕 까맹이가 조금 마음을 열었어요 (쓰다듬기 ${st.pets}/${CAT_RULE[1].pets})`); } }
 
 /* ================= 푸드 트럭 (타코야끼 · 붕어빵) ================= */
 const TRUCK = {
@@ -1647,7 +1766,7 @@ function bbShoot() {
   if (make) { ex = h.x + rnd(-0.6, 0.6); ez = h.z + rnd(0.9, 1.8); }
   else { const a = rnd(-1.2, 1.2), r = rnd(2, 4.5); ex = h.x + Math.sin(a) * r; ez = h.z + Math.cos(a) * r; }
   ex = clampN(ex, x0 + 0.6, x1 - 0.6); ez = clampN(ez, z0 + 1.2, z1 - 0.6);
-  const dur = 0.75 + d * 0.05, three = d > 6.1;
+  const dur = 0.75 + d * 0.05, three = d > (CT.bb.three || 6) + 0.3;
   bbSend({ holder: null, x: ex, z: ez, shot: { by: myId, fx: me.x, fz: me.z, make, side: Math.random() < 0.5 ? -1 : 1, ex, ez, dur, d, three } });
   setTimeout(() => {
     if (make) {
@@ -1685,8 +1804,8 @@ function bbPeers() {
 }
 // ---- 🎾 테니스 · 🏸 배드민턴 ----
 const RK = { tn: "TN-", bm: "BM-" };
-const courtOf = (seat) => (seat && seat.startsWith("TN-") ? "tn" : seat && seat.startsWith("BM-") ? "bm" : null);
-function courtPlayers(k) { return S.peers.filter((p) => p.seat && p.seat.startsWith(RK[k]) && CT[k].slots[p.seat]).map((p) => ({ id: p.id, name: p.name, slot: p.seat, side: CT[k].slots[p.seat][2] })); }
+const courtOf = (seat) => (CT.tn && seat && seat.startsWith("TN-") ? "tn" : CT.bm && seat && seat.startsWith("BM-") ? "bm" : null);
+function courtPlayers(k) { if (!CT[k]) return []; return S.peers.filter((p) => p.seat && p.seat.startsWith(RK[k]) && CT[k].slots[p.seat]).map((p) => ({ id: p.id, name: p.name, slot: p.seat, side: CT[k].slots[p.seat][2] })); }
 function joinCourt(k) {
   if (S.room !== "yard") return;
   const C = CT[k];
@@ -1702,7 +1821,7 @@ function joinCourt(k) {
 const rallyBusy = (k) => performance.now() < SP.rallyEnd[k];
 function slotXZ(k, slot) { const [x, z] = CT[k].slots[slot]; return { x, z }; }
 function courtLabel(k) {
-  const C = CT[k], sc = SP.score[k];
+  const C = CT[k], sc = SP.score[k]; if (!C) return;
   W.setCourtLabel(k, SP.canRally[k] || sc[0] || sc[1] ? `${C.emoji} ${C.name} · 앞 ${sc[0]} : ${sc[1]} 뒤` : `${C.emoji} ${C.name} · 눌러서 치기`);
 }
 function playHits(k, hits) { W.playRally(k, { hits }); const total = hits.reduce((a, h) => a + h.dur, 0); SP.rallyEnd[k] = performance.now() + total * 1000 + 1400; return total; }
@@ -1756,6 +1875,7 @@ function onRally(m) {
 }
 function racketTick() {
   for (const k of ["tn", "bm"]) {
+    if (!CT[k]) continue; // 2026-11-18: 테니스·배드민턴은 없앴어요
     const pl = courtPlayers(k), sides = [pl.filter((p) => p.side === 0), pl.filter((p) => p.side === 1)];
     const can = !!(sides[0].length && sides[1].length);
     if (can !== SP.canRally[k]) { SP.canRally[k] = can; if (!can && !pl.length) SP.score[k] = [0, 0]; courtLabel(k); }
@@ -1769,7 +1889,7 @@ function onSport(m) {
   if (!m || typeof m !== "object" || S.room !== "yard") return;
   if (m.k === "bb") {
     const ok = bbApply(m);
-    if (ok && m.shot && m.by !== myId && m.shot.make) setTimeout(() => { const me = W.actorPos(myId); if (me && me.z < -19) toast(`🏀 ${clip(m.name, 10) || "친구"}님 ${m.shot.three ? "3점슛!" : "골인!"}`); }, m.shot.dur * 1000);
+    if (ok && m.shot && m.by !== myId && m.shot.make) setTimeout(() => { const me = W.actorPos(myId); if (me && inRect(me, CT.bb.rect, 6)) toast(`🏀 ${clip(m.name, 10) || "친구"}님 ${m.shot.three ? "3점슛!" : "골인!"}`); }, m.shot.dur * 1000);
   }
   else if (m.k === "steal") onSteal(m);
   else if (m.k === "stealfail" && m.to === myId) { clearTimeout(SP.stealWait); toast(`🛡 ${clip(m.name, 10) || "친구"}님이 공을 지켰어요! 다시 🤚`); }
@@ -1824,7 +1944,7 @@ function sportTick() {
   renderSportBar();
 }
 setInterval(sportTick, 200);
-if ($("#courtBtn")) $("#courtBtn").onclick = () => { if (S.room !== "yard") return; W.moveMe({ x: -2, z: -23.2 }); toast("건물 뒤 운동장으로 가는 중이에요 ⛹️"); };
+if ($("#courtBtn")) $("#courtBtn").onclick = () => { if (S.room !== "yard") return; W.walkTo(26.3, -6.5); toast("🏀 농구장으로 가는 중이에요"); };
 
 /* ================= 함께하는 기능: 계절 장식 · 밤 모드 · 설교 본문 ================= */
 const SITE = { theme: "auto", night: "auto", sermon: null };
@@ -1877,7 +1997,7 @@ $("#smClear").onclick = () => setSetting("sermon", null, "설교 본문을 지�
 $("#themeSave").onclick = async () => { await setSetting("theme", $("#themeSel").value, "🎄 계절 장식을 바꿨어요"); await setSetting("night", $("#nightSel").value, "🌙 밤 모드를 바꿨어요"); };
 
 /* ================= 📅 모임 시간표 ================= */
-const PLACE = { yard: "🏡 마당", worship: "🙏 본당", cafe: "📖 성경 읽는 공간", vision: "🕊 비전 (2부)", room301: "🛋 301호 · 3Q (1부)", praise: "🎸 찬양팀 연습실", court: "⛹️ 운동장" };
+const PLACE = { yard: "🏡 마당", worship: "🙏 본당", cafe: "📖 성경 읽는 공간", vision: "🕊 비전 (2부)", room301: "🛋 301호 · 3Q (1부)", praise: "🎸 찬양팀 연습실", court: "🏀 농구장" };
 const placeName = (p) => PLACE[p] || p;
 let EVENTS = [];
 const gatherSkip = new Set();
@@ -1890,9 +2010,10 @@ function evWhen(e, short) {
 }
 async function loadEvents() { try { EVENTS = await api.listEvents(); } catch (e) { return; } renderEvents(); }
 function goPlace(p) {
-  if (p === "court") { const wait = S.room === "yard" ? 0 : 600; if (S.room !== "yard") joinRoom("yard", S.room); setTimeout(() => W.moveMe({ x: -2, z: -23.2 }), wait); toast("⛹️ 운동장으로 가는 중이에요"); return; }
+  if (p === "court") { const wait = S.room === "yard" ? 0 : 600; if (S.room !== "yard") joinRoom("yard", S.room); setTimeout(() => W.walkTo(26.3, -6.5), wait); toast("🏀 농구장으로 가는 중이에요"); return; }
   if (ROOMS.includes(p) && p !== S.room) joinRoom(p, S.room);
 }
+var gatherOpen = false; // 📅 지금 모여요: 처음엔 작은 배지로
 function renderEvents() {
   const up = EVENTS.filter((e) => new Date(e.ends_at) > Date.now());
   const ul = $("#schedList");
@@ -1901,9 +2022,12 @@ function renderEvents() {
   W.setBoard("schedBoard", up.slice(0, 5).map((e) => ({ l: (evNow(e) ? "🔔 " : "") + e.title, r: evNow(e) ? "지금 모여요!" : evWhen(e, true), hi: evNow(e) })));
   const g = up.find((e) => evNow(e) && !gatherSkip.has(e.id)), bar = $("#gatherBar");
   bar.hidden = !g || !started;
-  if (g) bar.replaceChildren(h("span", { text: `📅 지금 모여요! ${g.title} · ${placeName(g.place)}` }),
+  bar.classList.toggle("compact", !!g && !gatherOpen);
+  if (g && !gatherOpen) bar.replaceChildren(h("button", { class: "gather-pill", title: g.title, text: `📅 지금 모여요 · ${clip(g.title, 10)}`, onclick: () => { gatherOpen = true; renderEvents(); } }));
+  else if (g) bar.replaceChildren(...[h("span", { text: `📅 지금 모여요! ${g.title} · ${placeName(g.place)}` }),
     (g.place === "court" || ROOMS.includes(g.place)) && !(g.place === S.room) ? h("button", { class: "btn primary sm", text: "함께 가기", onclick: () => goPlace(g.place) }) : null,
-    h("button", { class: "btn ghost sm", text: "✕", title: "닫기", onclick: () => { gatherSkip.add(g.id); renderEvents(); } }));
+    h("button", { class: "btn ghost sm", text: "접기", onclick: () => { gatherOpen = false; renderEvents(); } }),
+    h("button", { class: "btn ghost sm", text: "✕", title: "닫기", onclick: () => { gatherSkip.add(g.id); renderEvents(); } })].filter(Boolean));
   if (!$("#schedModal").hidden) renderSchedFull();
   if (isAll()) renderAdminEvents();
 }
@@ -2645,7 +2769,7 @@ function openAdminParts() {
   applyAdminRole();
   const r = S.adminRole;
   if (r === "all" || r === "g1") { refreshAdmin(); openQuizAdmin(); openTogetherAdmin(); }
-  if (r === "all") { loadOrders(); orderPushState(); }
+  if (r === "all") { loadOrders(); orderPushState(); renderAdminSummary(S.admin); }
 }
 $("#adminBtn").onclick = () => {
   $("#adminHint").textContent = api.demo ? "데모 모드 비밀번호: 전체 demo · 1부 demo1 · 찬양팀 demo3" : "";
@@ -2952,9 +3076,8 @@ function renderPickers() {
   chips("#trailPick", L.trails, "trail");
   chips("#badgePick", [["", "없음"], ["newyear", "🎉 새해"], ["easter", "✝️ He is risen"], ["reform", "📖 5 SOLA"]], "badge");
   chips("#titlePick", [["", "없음"], ["branch", "🌿 가지"], ["fruit", "🍇 열매 맺는"], ["tree", "🌳 큰 나무 (금빛 이름표)"]], "title");
-  const petOk = skinOpen(skinFor("pet", "cat"), skinCtx());
-  $("#petPick").replaceChildren(...[[-1, "없음"], ...W.CATS.map((c, i) => [i, `🐱 ${c.name}`])].map(([v, label]) => h("button", { class: "chip-btn" + (draft.pet === v ? " sel" : "") + (!petOk && v >= 0 ? " locked" : ""), text: (!petOk && v >= 0 ? "🔒 " : "") + label,
-    onclick: () => { if (!petOk && v >= 0) { toast("🔒 따라다니는 고양이: 고양이 밥 20번 주면 받아요"); return; } draft.pet = v; if (v >= 0) draft.petPick = v; renderPickers(); } })));
+  const petOk = true;
+  $("#petPick").replaceChildren(h("span", { class: "muted tiny", text: "🐾 마당 고양이 콘도에서 밥을 주면 고를 수 있어요 (30분 산책)" })); void petOk;
   chips("#hairPick", L.hairs, "hair");
   swatch("#hairColorPick", L.hairColors.map((x) => x[0]), "hairColor");
   chips("#glassesPick", L.glasses, "glasses");
@@ -2969,6 +3092,7 @@ function renderMeChip() {
 function openEntry(first) {
   $("#entryTitle").textContent = first ? "퀸장그루터기에 오신 걸 환영해요 🌱" : "내 캐릭터 꾸미기";
   $("#enterBtn").textContent = first ? "마당으로 들어가기" : "저장";
+  $("#tourAgainBtn").hidden = !!first;
   $("#nameInput").value = draft.name || "";
   openModal("entryModal");
   if (!preview) { try { preview = W.preview($("#previewCanvas")); } catch (e) { console.warn(e); } }
@@ -2985,7 +3109,7 @@ $("#enterBtn").onclick = () => {
   store.set("profile", S.profile);
   closeModal("entryModal"); preview && preview.stop();
   renderMeChip();
-  if (!started) { started = true; joinRoom("yard", "def"); loadMissions().then(() => setTimeout(maybeWelcome, 1200)); } else refreshMe();
+  if (!started) { started = true; joinRoom("yard", "def"); loadMissions().then(() => setTimeout(() => (NEW_USER && !store.get("tourDone", false) ? startTour(() => { maybeWelcome(); linkPromptCheck(); }) : (maybeWelcome(), linkPromptCheck())), 1200)); } else refreshMe();
 };
 $("#nameInput").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) $("#enterBtn").click(); });
 $("#meChip").onclick = () => openEntry(false);
@@ -2994,6 +3118,8 @@ $$(".tab").forEach((t) => t.onclick = () => { if (started && t.dataset.room !== 
 /* ================= 패널 / HUD ================= */
 $$(".panel [data-toggle]").forEach((b) => b.onclick = () => b.closest(".panel").classList.toggle("collapsed"));
 if (window.innerWidth < 720) $$(".panel").forEach((p) => p.classList.add("collapsed"));
+// 🧭 화면 정리 (2026-11-18): 처음 온 날만 게시판을 펼쳐 두고, 다음 날부터는 접힌 채로 시작해요 (▾ 누르면 열려요)
+(() => { const fd = store.get("firstDay", null); if (!fd) store.set("firstDay", nyDay()); else if (fd !== nyDay()) $$(".panel").forEach((p) => p.classList.add("collapsed")); })();
 $("#zoomIn").onclick = () => W.setDist(W.cam.dist * 0.8);
 $("#zoomOut").onclick = () => W.setDist(W.cam.dist * 1.25);
 $("#resetView").onclick = () => W.resetView();
@@ -3533,7 +3659,7 @@ function renderCdShare() {
 const MS = { log: store.get("mlog", {}), books: {}, resolve: store.get("mresolve", ""), loaded: false, noServer: false, seen: new Set(store.get("mSeen", [])) };
 const dIdx = (d) => Math.floor(Date.parse(d + "T12:00:00Z") / 864e5); // 날짜 → 날 번호 (오늘의 말씀 계산과 같아요)
 const dStr = (i) => new Date(i * 864e5).toISOString().slice(0, 10);   // 날 번호 → 날짜
-const MCAP = (k) => (/^(visit|stamp|resolve|jam)$/.test(k) || /^(read|season|gift):/.test(k) ? 1 : k === "pray" ? 20 : 30);
+const MCAP = (k) => (/^(visit|stamp|resolve|jam|walk|walkq|campfire)$/.test(k) || /^(read|season|gift):/.test(k) ? 1 : k === "pray" ? 20 : k === "catpet" ? 10 : /^treat:/.test(k) ? 2 : 30);
 MS.giftAt = store.get("giftAt", {}); // { "날짜|선물id": 받은 시각(ms) } → 24시간 동안 입어요
 function saveMlog() {
   const cut = dIdx(nyDay()) - 800;
@@ -3573,7 +3699,7 @@ async function loadMissions() {
 const MISSIONS = {
   pray: { e: "🙏", t: "본당에서 기도하기", how: "본당에서 '🙏 기도하기'를 20초 넘게 하거나, 기도제목 말풍선을 올려요", go: () => goRoom("worship") },
   verse: { e: "📖", t: "오늘의 말씀 장 읽기", how: "오늘의 말씀이 있는 장을 1분 넘게 읽거나 '✓ 다 읽었어요'를 눌러요", go: () => { const v = todayVerse(); if (v) openReader(v.b - 1, v.c); } },
-  share: { e: "🍡", t: "간식 나누기", how: "친구에게 간식을 주거나, 푸드 트럭·쇼룸에서 만들어서 두고 와요", go: () => goYard(22.9, 4.0, "🐙 푸드 트럭") },
+  share: { e: "🍡", t: "간식 나누기", how: "친구에게 간식을 주거나, 푸드 트럭·쇼룸에서 만들어서 두고 와요", go: () => goYard(-30.6, 7.0, "🍢 먹거리 골목") },
   catfeed: { e: "🐾", t: "고양이 밥 주기", how: "마당 왼쪽 고양이 콘도에서 밥을 줘요", go: () => goYard(-19.5, -6.2, "🐱 고양이 콘도", openCatFood) },
   quiz: { e: "🧩", t: "성경 퀴즈 한 판", how: "5문제를 풀고 '채점하기'까지 눌러요", go: () => openQuiz("play") },
   jam: { e: "🎸", t: "연습실에서 연주하기", how: "찬양팀 연습실 악기 자리에 서서 소리를 내 봐요", go: () => goRoom("praise") },
@@ -3695,7 +3821,6 @@ const SKINS = [
   { slot: "halo", v: "sprout2", e: "🌱", name: "머리 위 새싹 둘 (로고처럼)", need: "14일 연속 출석", prog: (c) => [c.st.best, 14] },
   { slot: "halo", v: "bud", e: "🌷", name: "꽃봉오리 새싹", need: "30일 연속 출석", prog: (c) => [c.st.best, 30] },
   { slot: "trail", v: "sprout", e: "👣", name: "새싹 발자국", need: "기도 30번 (10분에 한 번씩 세요)", prog: (c) => [c.t.pray, 30] },
-  { slot: "pet", v: "cat", e: "🐱", name: "따라다니는 고양이", need: "고양이 밥 20번 · 일주일에 한 번은 밥을 줘야 계속 따라와요", prog: (c) => [c.t.catfeed, 20] },
   { slot: "item", v: "scroll", e: "📜", name: "두루마리 성경", need: "성경 한 권 다 읽기 (이름표에 최근 다 읽은 책)", prog: (c) => [c.books.length, 1] },
   { slot: "apron", v: "cheese", e: "🧀", name: "치즈 앞치마", need: "쇼룸에서 쫀득쿠키 10박스 만들기", prog: (c) => [c.t.cookie, 10] },
   // ✅ 미션 도장 모으기 (그루터기에서 자라나요 · 사 6:13, 요 15:5)
@@ -3730,7 +3855,7 @@ function mySkins() {
   const p = S.profile || {}, c = mCtx || skinCtx(), ok = (slot, v) => v && v !== "none" && (!skinFor(slot, v) || skinOpen(skinFor(slot, v), c));
   const out = { halo: ok("halo", p.halo) ? p.halo : "none", trail: ok("trail", p.trail) ? p.trail : "none", shoulder: ok("shoulder", p.shoulder) ? p.shoulder : "none",
     apron: ok("apron", p.apron) ? p.apron : "none", pin: ok("pin", p.pin) ? p.pin : "none",
-    pet: Number.isInteger(p.pet) && p.pet >= 0 && skinOpen(skinFor("pet", "cat"), c) && petActive(c) ? p.pet : -1,
+    ...catWalkLook(), // 🐾 산책 중인 고양이 (pet · pets · petAt · catBoss)
     item: lockedLook("item", p.item) ? "none" : p.item, wear: lockedLook("wear", p.wear) ? "none" : p.wear, badge: "", book: "", title: "", costume: giftActive() || "" };
   if (p.title && skinFor("title", p.title) && skinOpen(skinFor("title", p.title), c)) out.title = p.title;
   if (p.badge && skinFor("badge", p.badge) && skinOpen(skinFor("badge", p.badge), c)) { const ys = c.won[p.badge] || []; out.badge = BADGE_TXT[p.badge](ys[ys.length - 1]); }
@@ -3742,7 +3867,7 @@ function mySkins() {
 function missionCheck(kind) {
   const d = nyDay(), list = todayMissions(), day = MS.log[d] || {};
   if (kind) { const m = list.find((x) => x.done && (x.m === kind || (x.m === "share" && kind === "give") || (x.m === "verse" && /^read:/.test(kind)))); if (m && !store.get("mT" + d + m.m, false)) { store.set("mT" + d + m.m, true); toast(`${m.e} 오늘의 미션 완료: ${m.t} ✓`); } }
-  if (list.every((x) => x.done) && !day.stamp) { mAdd("stamp"); setTimeout(() => { toast("🎉 오늘의 미션 3개 다 했어요! 도장 쾅 ✅ 선물 상자가 열렸어요 🎁"); confetti(); openGift(); }, 900); }
+  if (list.every((x) => x.done) && !day.stamp) { mAdd("stamp"); setTimeout(() => { toast("🎉 오늘의 미션 3개 다 했어요! 도장 쾅 ✅ 선물 상자가 열렸어요 🎁"); confetti(); openGift(); const tk = TREAT_KEYS[hash2(dIdx(d) * 3 + 1, tokHash) % 5]; setTimeout(() => toast(`🎒 고양이 특식 ${TREATS[tk].e} ${TREATS[tk].name} 1개도 받았어요! 고양이 콘도에서 줘 봐요`), 4500); }, 900); }
   const sn = seasonNow();
   if (sn && sn.tasks.every(([k]) => seasonTaskDone(k, sn.a, sn.b)) && !(seasonWon()[sn.id] || []).includes(sn.y)) {
     mAdd(`season:${sn.id}:${sn.y}`);
@@ -3872,7 +3997,8 @@ $$("[data-atab]").forEach((b) => (b.onclick = () => { albumTab = b.dataset.atab;
 function renderAlbum() {
   $$("[data-atab]").forEach((b) => b.classList.toggle("active", b.dataset.atab === albumTab));
   const c = skinCtx(), body = $("#albumBody");
-  body.replaceChildren(...({ mission: albumMission, gift: albumGift, skins: albumSkins, record: albumRecord, card: albumCard }[albumTab] || albumMission)(c));
+  const out = ({ mission: albumMission, gift: albumGift, skins: albumSkins, record: albumRecord, card: albumCard, walk: albumWalk }[albumTab] || albumMission)(c);
+  if (out && out.then) out.then((x) => body.replaceChildren(...x.filter(Boolean))); else body.replaceChildren(...out);
 }
 function albumMission(c) {
   const list = todayMissions(), done = list.filter((x) => x.done).length, sn = seasonNow(), nx = seasonNext();
@@ -3923,7 +4049,9 @@ function albumSkins(c) {
   };
   const out = [h("p", { class: "muted tiny", text: "받은 스킨은 다른 사람 화면에도 보여요. 캐릭터 꾸미기(위쪽 내 이름)에서도 바꿀 수 있어요." }),
     h("div", { class: "board-label", text: "🎖 활동 스킨 · 받으면 평생" }), h("div", { class: "al-skins" }, ...SKINS.filter((k) => !k.season).map(card))];
-  if (skinOpen(skinFor("pet", "cat"), c)) {
+  out.push(h("div", { class: "board-label", text: "🐾 고양이 산책" }), h("p", { class: "muted tiny", text: "고양이마다 성격이 달라요. 밥·특식·쓰다듬기로 친해지면, 밥을 줄 때마다 30분 같이 산책해요." }),
+    h("button", { class: "btn primary", text: "🐾 고양이들과의 친밀도 보기", onclick: () => { closeModal("albumModal"); openCatFood(); } }));
+  if (false) {
     out.push(h("div", { class: "board-label", text: "🐱 나를 따라올 고양이" }),
       h("div", { class: "chips" }, ...W.CATS.map((ct, i) => h("button", { class: "chip-btn" + ((Number.isInteger(p.petPick) ? p.petPick : 0) === i ? " sel" : ""), text: `${ct.name} ${ct.sex}`, onclick: () => { const prof = { ...S.profile, petPick: i }; if (Number.isInteger(prof.pet) && prof.pet >= 0) prof.pet = i; S.profile = prof; store.set("profile", prof); Object.assign(draft, prof); refreshMe(); renderAlbum(); } }))),
       h("p", { class: "muted tiny", text: petActive(c) ? "마당에서만 따라다녀요. 실내에 들어가면 마당에서 기다려요." : "😺 고양이가 콘도에서 쉬는 중이에요. 밥을 주면 다시 따라와요 (마지막 밥 7일 지남)." }));
@@ -3947,6 +4075,7 @@ function albumRecord(c) {
     c.books.length ? h("div", { class: "chips" }, ...c.books.map((b) => h("span", { class: "chip", text: "📜 " + b.name }))) : h("p", { class: "muted tiny", text: "아직 없어요. 통독표에 체크하거나 본문을 읽으면 쌓여요. 한 권을 다 읽으면 📜 두루마리 성경을 받아요." }),
     MS.resolve ? h("p", { class: "al-resolve", text: `✍️ 나의 새해 다짐: ${MS.resolve}` }) : null,
     h("p", { class: "muted tiny", text: api.demo ? "데모 모드: 이 기기에만 저장돼요." : MS.noServer ? "⚠ 아직 서버 저장 준비 전이라 이 기기에만 저장돼요 (관리자: supabase-update-missions.sql)." : "기록은 서버에도 저장돼요. 같은 기기·같은 브라우저로 들어오면 이어져요." }),
+    h("button", { class: "btn ghost wide", text: "📱 기록이 안 보이나요? 다른 기기와 연결해요", onclick: () => { closeModal("albumModal"); openLink(); } }),
   ];
 }
 // ---- 📸 나의 그루터기 카드 (공유용 그림): 내 캐릭터 + 다녀간 날·말씀·기도·활동 그래프 + 가진 아이템 ----
@@ -4682,6 +4811,116 @@ function renderSkateBar(force) {
 document.addEventListener("keydown", (e) => { if (!SK.race || e.repeat) return; if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") { e.preventDefault(); skPush("L"); } if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") { e.preventDefault(); skPush("R"); } });
 setInterval(() => { if (S.room === "yard") renderSkateBar(); else if (!$("#skateBar").hidden) $("#skateBar").hidden = true; }, 400);
 
+/* ================= 🔥 뒷마당 쉼터: 캠프파이어 · 🌿 말씀 산책길 (2026-11-18) ================= */
+// ---- 🔥 캠프파이어: 통나무(CF-0~7)에 앉으면 아래 막대 → 🍡 마시멜로 굽기 (노릇할 때 꺼내기) ----
+const FIREG = { roast: null, sitAt: 0 };
+function fireSeat() { return S.room === "yard" && S.seat && S.seat.startsWith("CF-"); }
+function renderFireBar() {
+  const bar = $("#fireBar"); if (!bar) return;
+  if (!fireSeat()) { if (FIREG.roast) roastStop(true); if (!bar.hidden) bar.hidden = true; FIREG.sitAt = 0; FIREG.key = ""; return; }
+  if (!FIREG.sitAt) FIREG.sitAt = Date.now();
+  if (Date.now() - FIREG.sitAt > 10000) mAdd("campfire"); // 10초 넘게 앉아 있으면 미션
+  const R = FIREG.roast, n = S.peers.filter((p) => p.seat && p.seat.startsWith("CF-")).length;
+  const key = R ? "r" : `i|${n}|${S.carry || ""}`;
+  if (key === FIREG.key) { if (R) roastDraw(); return; }
+  FIREG.key = key; bar.hidden = false;
+  if (R) { bar.replaceChildren(h("span", { class: "sb-t", text: "🍡 굽는 중… 노릇노릇할 때 꺼내요!" }), h("div", { class: "roast-bar" }, h("i", { class: "roast-zone" }), h("b", { class: "roast-pin" })), h("button", { class: "btn primary sm", text: "꺼내기!", onclick: roastPull })); roastDraw(); return; }
+  bar.replaceChildren(h("span", { class: "sb-t", text: `🔥 캠프파이어 · 둘러앉은 사람 ${n}명` }),
+    h("button", { class: "btn primary sm", text: "🍡 마시멜로 굽기", onclick: roastStart }),
+    h("button", { class: "btn ghost sm", text: "일어나기", onclick: () => W.stand() }));
+}
+function roastStart() { FIREG.roast = { t0: Date.now() }; setCarry("marshraw"); FIREG.key = ""; renderFireBar(); }
+function roastP() { return FIREG.roast ? (Date.now() - FIREG.roast.t0) / 9000 : 0; } // 0 → 1 (9초면 까맣게)
+function roastDraw() { const pin = $("#fireBar .roast-pin"); if (pin) pin.style.left = Math.min(100, roastP() * 100) + "%"; if (roastP() > 1.15) roastPull(); }
+function roastPull() {
+  const p = roastP(); FIREG.roast = null; FIREG.key = "";
+  if (p < 0.45) { setCarry("marshraw"); toast("아직 하얘요! 조금만 더 구워요 🍡 (다시 '굽기')"); }
+  else if (p <= 0.78) { setCarry("marsh"); mAdd("marsh"); toast("✨ 노릇노릇 완벽해요! 먹거나 친구에게 줘 봐요 🍡"); S.bubble = "🍡 마시멜로 완벽하게 구웠어요!"; S.kind = "status"; S.amens = 0; refreshMe(); }
+  else { setCarry("marshburnt"); toast("앗, 까맣게 탔어요 😅 그래도 냠냠 맛있을걸요?"); }
+  renderFireBar();
+}
+function roastStop() { FIREG.roast = null; if (S.carry === "marshraw") setCarry(null); }
+setInterval(() => { if (S.room === "yard" || !$("#fireBar").hidden) renderFireBar(); }, 200);
+
+// ---- 🌿 말씀 산책길: 매일 바뀌는 말씀 7개 → 순서대로 지나가면 표지판이 빛나요 → 출발점으로 돌아오면 오늘의 질문 ----
+const WALK_Q = [
+  "오늘 말씀 중 마음에 남은 한 구절은? 왜 그런가요?", "요즘 하나님께 가장 감사한 것 한 가지는?", "지금 나를 가장 지치게 하는 것은 무엇인가요? 하나님께 맡겨 볼까요?",
+  "오늘 말씀이 이번 주 나에게 해 주는 말은?", "요즘 기도하고 있는 제목 하나를 적어 보세요", "최근에 누군가에게 받은 사랑(도움)이 있다면?",
+  "올해 하나님이 나를 자라게 하신 부분은?", "지금 용서하거나 화해하고 싶은 사람이 있나요?", "내가 요즘 붙잡고 있는 걱정 하나와, 그 대신 붙잡을 말씀은?",
+  "오늘 하루 중 하나님이 가까이 느껴졌던 순간은?", "이번 주에 작은 친절을 베풀 수 있는 사람은 누구일까요?", "나에게 '쉼'은 무엇인가요? 요즘 잘 쉬고 있나요?",
+  "어릴 때 처음 믿음을 갖게 된 기억이 있다면?", "요즘 나의 마음 날씨는? (맑음·흐림·비…) 왜 그런가요?", "하나님께 솔직하게 묻고 싶은 질문이 있다면?",
+  "내가 가진 것 중 나눌 수 있는 것은 무엇인가요?", "이번 주 나를 웃게 한 일은?", "지금 기다리고 있는 응답이 있나요? 기다리는 마음은 어떤가요?",
+  "오늘 말씀을 한 문장으로 바꿔 말하면?", "요즘 내 삶에서 '그루터기'처럼 남아 있는 소망은?", "1년 뒤의 나에게 하고 싶은 말은?",
+  "내가 좋아하는 찬양 한 곡과 그 이유는?", "요즘 나를 위해 기도해 주는 사람은 누구인가요? 그 사람을 위해 한 줄 기도해요", "오늘 내려놓고 싶은 것 하나는?",
+  "하나님이 나를 어떻게 보신다고 생각하나요?", "최근에 배운 것(신앙이든 삶이든) 하나는?", "이번 주 꼭 지키고 싶은 작은 약속 하나는?", "지금 이 순간 하나님께 드리고 싶은 한 마디는?",
+];
+const WALKS = { verses: [], q: "", done: 0, d: "" };
+function walkToday() {
+  const d = nyDay(); if (WALKS.d === d && WALKS.verses.length) return WALKS;
+  const V = window.VERSES || [], N = V.length, base = dIdx(d) * 7;
+  const verses = []; for (let i = 0; i < 7 && N; i++) { const v = V[(base + i * 47) % N]; verses.push({ text: v.text, ref: v.ref, b: v.b, c: v.c }); }
+  const st = store.get("walkDay", null);
+  Object.assign(WALKS, { d, verses, q: WALK_Q[dIdx(d) % WALK_Q.length], done: st && st.d === d ? st.n : 0, asked: st && st.d === d ? !!st.asked : false });
+  W.setWalk(verses, WALKS.done);
+  return WALKS;
+}
+function walkSave() { store.set("walkDay", { d: WALKS.d, n: WALKS.done, asked: WALKS.asked }); W.setWalk(null, WALKS.done); }
+function walkCardShow(i, note) {
+  const c = $("#walkCard"), v = WALKS.verses[i]; if (!v) return;
+  c.replaceChildren(h("div", { class: "wk-n", text: `🌿 말씀 산책길 ${i + 1} / 7` }), h("p", { class: "wk-t", text: v.text }), h("div", { class: "wk-r", text: v.ref + " (개역한글)" }),
+    note ? h("div", { class: "wk-note", text: note }) : null,
+    h("div", { class: "wk-btns" }, h("button", { class: "btn ghost sm", text: "📖 이 장 읽기", onclick: () => { c.hidden = true; openReader(v.b - 1, v.c); } }), h("button", { class: "btn ghost sm", text: "닫기", onclick: () => (c.hidden = true) })));
+  c.hidden = false; clearTimeout(WALKS.hideT); WALKS.hideT = setTimeout(() => (c.hidden = true), 14000);
+}
+function walkTick() {
+  if (S.room !== "yard" || !started) return;
+  const me = W.actorPos(myId); if (!me) return;
+  walkToday();
+  const S7 = W.WALK.signs;
+  if (WALKS.done < 7) {
+    const nx = S7[WALKS.done];
+    if (Math.hypot(me.x - nx.path.x, me.z - nx.path.z) < 2.6) {
+      WALKS.done++; walkSave();
+      walkCardShow(WALKS.done - 1, WALKS.done === 7 ? "🎉 7개를 다 걸었어요! 출발점(아치)으로 돌아가면 오늘의 질문이 기다려요" : `다음 표지판으로 걸어가요 (${WALKS.done}/7)`);
+    } else {
+      const k = S7.findIndex((sg, i) => i > WALKS.done && Math.hypot(me.x - sg.path.x, me.z - sg.path.z) < 2.2);
+      if (k > 0 && WALKS.hintAt !== k) { WALKS.hintAt = k; toast(`🌿 ${WALKS.done + 1}번 표지판부터 순서대로 걸어요 (출발: 아치 → 왼쪽으로)`); }
+    }
+  } else if (!WALKS.asked && Math.hypot(me.x - W.WALK.start.x, me.z - W.WALK.start.z) < 2.6) {
+    WALKS.asked = true; walkSave(); mAdd("walk"); openWalkQ();
+  }
+}
+setInterval(walkTick, 500);
+function openWalkQ() {
+  const ta = h("textarea", { class: "walk-ta", maxlength: 500, rows: 5, placeholder: "떠오르는 대로 편하게 적어요. 나만 볼 수 있어요 🌿" });
+  $("#walkBody").replaceChildren(
+    h("p", { class: "walk-q", text: WALKS.q }),
+    h("p", { class: "muted tiny", text: "답은 🌱 내 그루터기 → 🌿 산책 노트에 날짜별로 쌓여요. 나만 볼 수 있어요." }), ta,
+    h("div", { class: "modal-actions" }, h("button", { class: "btn ghost", text: "다음에", onclick: () => closeModal("walkModal") }),
+      h("button", { class: "btn primary", text: "📝 노트에 남기기", onclick: async (e) => {
+        const a = ta.value.trim(); if (!a) return toast("한 줄이라도 적어 주세요 🙂"); if (!checkText(a)) return;
+        e.target.disabled = true;
+        try { await api.walkNoteSave(WALKS.q, a); mAdd("walkq"); closeModal("walkModal"); toast("🌿 산책 노트에 남겼어요"); } catch (er) { toast(er.message); e.target.disabled = false; }
+      } })));
+  openModal("walkModal");
+}
+function openWalkInfo(i) {
+  walkToday();
+  if (i != null) { walkCardShow(i, i < WALKS.done ? "✓ 오늘 지나간 표지판이에요" : i === WALKS.done ? "가까이 걸어가면 지나간 걸로 쳐요" : `${WALKS.done + 1}번부터 순서대로 걸어요`); return; }
+  toast(WALKS.done >= 7 ? (WALKS.asked ? "🌿 오늘 산책을 마쳤어요. 내일 새 말씀이 걸려요" : "🌿 출발점 아치로 가면 오늘의 질문이 나와요") : `🌿 말씀 산책길: 아치에서 출발해 표지판 7개를 순서대로 지나가요 (${WALKS.done}/7)`);
+  if (WALKS.done === 0) { const s1 = W.WALK.signs[0]; W.walkTo(W.WALK.start.x, W.WALK.start.z - 0.4); setTimeout(() => toast(`첫 표지판은 아치에서 ${s1.path.x < W.WALK.start.x ? "왼쪽" : "오른쪽"}이에요`), 2500); }
+}
+async function albumWalk() {
+  const box = h("div", {}, h("p", { class: "muted", text: "불러오는 중…" }));
+  (async () => {
+    let list = [];
+    try { list = await api.walkNotes(); } catch (e) { box.replaceChildren(h("p", { class: "muted", text: "산책 노트를 불러오지 못했어요: " + e.message })); return; }
+    box.replaceChildren(...(list.length ? list.map((n) => h("div", { class: "walk-note" }, h("small", { text: n.day }), h("b", { text: n.q }), h("p", { text: n.a })))
+      : [h("p", { class: "muted", text: "아직 없어요. 🔥 뒷마당 쉼터의 🌿 말씀 산책길을 끝까지 걸으면 오늘의 질문이 나와요." }), h("button", { class: "btn primary", text: "🌿 산책길로 가기", onclick: () => { closeModal("albumModal"); goYard(-3, -22.6, "🌿 말씀 산책길"); } })]));
+  })();
+  return [h("div", { class: "board-label", text: "🌿 산책 노트 · 나만 봐요" }), box];
+}
+
 /* ================= 🗺 마당 지도 ================= */
 // 마당을 위에서 내려다본 간단한 지도. 누르면 그곳으로 걸어가요 (다른 방에 있으면 먼저 마당으로 나와요).
 // 좌표는 3D 마당과 같은 미터 단위(x: 왼쪽→오른쪽, z: 건물 뒤→앞길)
@@ -4699,11 +4938,11 @@ const MAP_POI = [
   { k: "sled", x: 26.5, z: -32, e: "🛷", t: "눈썰매 · 놀이터" },
   { k: "walk", x: 28.6, z: -21.7, e: "🎠", t: "그네" },
   { k: "walk", x: 43, z: -11.5, e: "⛸", t: "스케이트장" },
-  { k: "walk", x: 22.9, z: 4.0, e: "🐙", t: "타코야끼" },
-  { k: "walk", x: 29.1, z: 4.0, e: "🐟", t: "붕어빵" },
-  { k: "walk", x: -15, z: -27.5, e: "🏀", t: "농구장" },
-  { k: "walk", x: 3.5, z: -23.2, e: "🎾", t: "테니스장" },
-  { k: "walk", x: 15, z: -23.2, e: "🏸", t: "배드민턴장" },
+  { k: "walk", x: -32.0, z: 6.6, e: "🐙", t: "타코야끼" },
+  { k: "walk", x: -29.2, z: 6.6, e: "🐟", t: "붕어빵" },
+  { k: "walk", x: 26.3, z: -8.5, e: "🏀", t: "농구장" },
+  { k: "walk", x: -3, z: -28.2, e: "🔥", t: "캠프파이어" },
+  { k: "walk", x: -3, z: -22.8, e: "🌿", t: "말씀 산책길" },
 ];
 function renderMap() {
   const NS = "http://www.w3.org/2000/svg", svg = document.createElementNS(NS, "svg");
@@ -4712,9 +4951,13 @@ function renderMap() {
   el("rect", { x: -37, y: -45, width: 92, height: 68, fill: "#cfe6b8" });
   el("rect", { x: 35, y: -36, width: 16, height: 30, fill: "#e4f4fb", stroke: "#fbfbf7", "stroke-width": 0.5, rx: 3 }); // ⛸ 스케이트장
   el("ellipse", { cx: 43, cy: -21, rx: 5.4, ry: 11.8, fill: "none", stroke: "#d9483b", "stroke-width": 0.2 });
-  el("rect", { x: -26, y: -42.5, width: 46, height: 21.5, fill: "#8b8f96", rx: 1 }); // 운동장 아스팔트
-  el("text", { x: -1, y: -43.2, class: "mt", "text-anchor": "middle" }, "⛹️ 운동장 (건물 뒤)");
-  for (const [x0, z0, x1, z1] of [[-22.5, -36.2, -7.5, -21.5], [-1.5, -41.5, 8.5, -21.5], [12, -34.9, 18.1, -21.5]]) el("rect", { x: x0, y: z0, width: x1 - x0, height: z1 - z0, fill: "none", stroke: "#fff", "stroke-width": 0.25 });
+  el("ellipse", { cx: -3, cy: -32.6, rx: 16, ry: 8.6, fill: "none", stroke: "#d9cdb6", "stroke-width": 0.9 }); // 🌿 말씀 산책길
+  el("circle", { cx: -3, cy: -31.2, r: 3.4, fill: "#e8d9b8" }); el("circle", { cx: -3, cy: -31.2, r: 0.9, fill: "#ff8a3c" }); // 🔥 캠프파이어
+  el("text", { x: -3, y: -43.2, class: "mt", "text-anchor": "middle" }, "🔥 뒷마당 쉼터");
+  el("rect", { x: 20.6, y: -19.2, width: 11.4, height: 14.4, fill: "#3f7f63", stroke: "#fff", "stroke-width": 0.25, rx: 0.4 }); // 🏀 농구장
+  el("rect", { x: -32.7, y: -1.2, width: 4.2, height: 13, fill: "#e2d6bf" }); // 🍢 골목
+  el("text", { x: -30.6, y: 14.8, class: "mt", "text-anchor": "middle" }, "🍢 먹거리 골목");
+  el("text", { x: 38, y: -38, class: "mt", "text-anchor": "middle" }, "⛹️ 놀이 동산");
   el("rect", { x: -15, y: -19, width: 30, height: 15, fill: "#b4583f", rx: 0.6 }); // 교회 건물
   el("rect", { x: -14.2, y: -6, width: 3.2, height: 3.2, fill: "#f1eee8" }); // 첨탑
   el("text", { x: 0, y: -11, class: "mt big", "text-anchor": "middle", fill: "#fff" }, "⛪ 교회 건물");
@@ -4723,13 +4966,13 @@ function renderMap() {
   el("line", { x1: -37, y1: 18, x2: 55, y2: 18, stroke: "#e8c23a", "stroke-width": 0.2, "stroke-dasharray": "2 1.5" });
   el("text", { x: 4, y: 21.2, class: "mt", "text-anchor": "middle", fill: "#fff" }, "🚗 앞길 (차가 다녀요)");
   el("rect", { x: -3.6, y: -4, width: 1.2, height: 16.6, fill: "#e4e0d8" }); el("rect", { x: 8.4, y: -4, width: 1.2, height: 16.6, fill: "#e4e0d8" }); // 길
-  el("rect", { x: 20.3, y: -42.9, width: 11.6, height: 22.8, fill: "#e3eef5", rx: 0.6 }); // 놀이터 (배드민턴장 오른쪽)
+  el("rect", { x: 20.3, y: -42.9, width: 11.6, height: 22.8, fill: "#e3eef5", rx: 0.6 }); // 놀이터 (눈썰매·그네)
   el("polygon", { points: "22.4,-42.3 30.6,-42.3 30.6,-22.7 22.4,-22.7", fill: "#f7fbfd" }); // 눈썰매 언덕
   el("rect", { x: 19.8, y: 2.8, width: 12.4, height: 4.4, fill: "#e4e0d8" }); // 트럭 앞 보도
   el("rect", { x: -23.5, y: -12, width: 5, height: 4.5, fill: "#c9a46a", rx: 0.4 }); // 고양이 콘도
   el("rect", { x: -34.9, y: -11.8, width: 8.6, height: 10, fill: "#efe4cf", rx: 0.4 }); // 쇼룸 앞 돌 바닥
   el("rect", { x: -33.6, y: -11.6, width: 6, height: 4.4, fill: "#f7c948", stroke: "#d9483b", "stroke-width": 0.35, rx: 0.4 }); // 🧀 쇼룸
-  for (const x of [22.9, 29.1]) el("rect", { x: x - 2.6, y: 0.1, width: 5.2, height: 2.6, fill: x < 26 ? "#d9483b" : "#2f4f8a", rx: 0.4 });
+  el("rect", { x: -35.7, y: 0.5, width: 2.7, height: 5.2, fill: "#d9483b", rx: 0.4 }); el("rect", { x: -28.2, y: 1.2, width: 2.7, height: 5.2, fill: "#2f4f8a", rx: 0.4 }); // 🚚 트럭 2대
   const me = S.room === "yard" ? W.actorPos(myId) : null;
   // 사람들 (마당에 있을 때)
   if (S.room === "yard") for (const p of S.peers) { const a = W.actorPos(p.id); if (a && p.id !== myId) el("circle", { cx: a.x, cy: a.z, r: 0.7, fill: p.color || "#888", stroke: "#fff", "stroke-width": 0.2 }); }
@@ -4745,8 +4988,41 @@ function renderMap() {
   if (me) { el("circle", { cx: me.x, cy: me.z, r: 1.1, fill: "#f0a050", stroke: "#fff", "stroke-width": 0.35 }); el("text", { x: me.x, y: me.z - 1.6, class: "pt me", "text-anchor": "middle" }, "나"); }
   $("#mapWrap").replaceChildren(svg);
 }
+// 🧭 구역 · ✨ 바로 가기 (2026-11-18): 25m 넘게 먼 곳은 "걸어가기 / 바로 가기"를 골라요. 바로 가기는 그 구역 입구에 반짝 도착한 뒤 걸어가요
+const ZONE_LAND = { play: { x: 26, z: 4.6 }, back: { x: -3, z: -22.8 }, food: { x: -30.6, z: 11.6 }, cat: { x: -20.6, z: 0.4 }, front: { x: 0, z: 9.5 } };
+function warpTo(zoneId, then) {
+  const L = ZONE_LAND[zoneId] || ZONE_LAND.front, a = W.me && W.me();
+  W.placeMe(L.x, L.z); S.pos = { x: L.x, z: L.z }; S.seat = null; refreshMe();
+  setTimeout(() => { floatAt(myId, "✨", "바로 가기"); if (then) then(); }, 80); void a;
+}
+function askWarp(target, zoneId, label, walk) {
+  const me = S.room === "yard" && W.actorPos(myId), far = me && Math.hypot(me.x - target.x, me.z - target.z) > 25;
+  if (!far) { walk(); return; }
+  let pop = $("#warpPop"); if (!pop) { pop = h("div", { id: "warpPop", class: "warp-pop" }); document.body.append(pop); }
+  pop.replaceChildren(h("b", { text: `${label}까지 멀어요` }),
+    h("div", { class: "warp-btns" }, h("button", { class: "btn ghost", text: "🚶 걸어가기", onclick: () => { pop.hidden = true; walk(); } }),
+      h("button", { class: "btn primary", text: "✨ 바로 가기", onclick: () => { pop.hidden = true; warpTo(zoneId, walk); } })),
+    h("button", { class: "x", text: "✕", onclick: () => (pop.hidden = true) }));
+  pop.hidden = false;
+}
+function zoneGo(id) {
+  const L = ZONE_LAND[id] || ZONE_LAND.front, Z = (W.ZONES || []).find((z) => z.id === id), name = Z ? Z.name : "그곳";
+  const go = () => { askWarp(L, id, name, () => { W.walkTo(L.x, L.z); toast(`${name}으로 가요`); }); };
+  if (S.room !== "yard") { joinRoom("yard", S.room); setTimeout(() => { warpTo(id); toast(`✨ ${name}에 도착했어요`); }, 700); } else go();
+}
+function renderZoneChip() {
+  let el = $("#zoneChip"); if (!el) { el = h("div", { id: "zoneChip", class: "zone-chip" }); $("#viewport").append(el); }
+  const me = S.room === "yard" && W.actorPos(myId), z = me && W.zoneOf(me.x, me.z), txt = S.room === "yard" ? (z ? "📍 " + z.name.replace(/^\S+\s/, "") : "") : "📍 " + (ROOM_NAME[S.room] || "");
+  if (el.textContent !== txt) { el.textContent = txt; el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); }
+  el.hidden = !started || !txt;
+}
+setInterval(renderZoneChip, 700);
 function mapGo(poi) {
   closeModal("mapModal");
+  if (S.room === "yard" && poi.k !== "sled") { const z = W.zoneOf(poi.x, poi.z), go0 = () => mapGo2(poi); askWarp(poi, z ? z.id : "front", `${poi.e} ${poi.t}`, go0); return; }
+  mapGo2(poi);
+}
+function mapGo2(poi) {
   const go = () => {
     if (poi.k === "door") { W.goDoor(poi.to); toast(`${poi.e} ${poi.t}(으)로 가요`); return; }
     if (poi.k === "sled") { W.goSled(); return; }
@@ -4793,14 +5069,18 @@ W.init($("#viewport"), $("#overlay"), {
     if (a === "sled") W.goSled();
     if (a === "cafeShelf") openShelf();
     if (a.startsWith("truck:")) openTruck(a.slice(6));
-    if (a.startsWith("cat:")) { const c = W.petCat(+a.slice(4)); if (c) toast(`${c.name} ${c.sex || ""} · ${c.desc}: 냐옹~ 🐾`); }
+    if (a.startsWith("cat:")) { const i = +a.slice(4), c = W.petCat(i); if (c) { toast(`${c.name} ${c.sex || ""} · ${CAT_RULE[i].trait}: 냐옹~ 🐾`); catPetted(i); } }
     if (a === "catfood") openCatFood();
     if (a === "showroom") openShowroom();
     if (a === "buy:s" || a === "buy:l") openOrder(a.slice(4));
     if (a === "cookie") startCookie();
     if (a === "rink") { if (onIceMe()) toast("⛸ 아래 막대에서 🏁 경주나 🩰 피겨 연기를 해 봐요!"); else goRink(); }
     if (a === "rinkrank") openRinkRank();
-    if (a.startsWith("pet:")) { const pi = W.petOf(a.slice(4)); if (pi && pi.i === 99) toast(`🦁 다니엘의 사자예요. 사자들의 입을 봉하셨어요 (다니엘 6:22)`); else if (pi) { W.petCat(pi.i); const c = W.CATS[pi.i]; toast(`🐱 ${c.name}${pi.owner ? `가 ${clip(pi.owner, 10)}님을` : "가 누군가를"} 졸졸 따라다녀요 💕`); } }
+    if (a === "walk") openWalkInfo();
+    if (a.startsWith("walksign:")) openWalkInfo(+a.slice(9));
+    if (a === "campfire") { if (S.room === "yard") { const free = Array.from({ length: 8 }, (_, k) => "CF-" + k).filter((id) => W.seatFree(id)); if (free.length) W.sitNear(free, W.FIRE); else toast("🔥 통나무가 꽉 찼어요!"); } }
+    if (a.startsWith("zone:")) zoneGo(a.slice(5));
+    if (a.startsWith("pet:")) { const [pid, pk] = a.slice(4).split(":"), pi = W.petOf(pid, pk != null ? +pk : null); if (pi && pi.i === 99) toast(`🦁 다니엘의 사자예요. 사자들의 입을 봉하셨어요 (다니엘 6:22)`); else if (pi) { W.petCat(pi.i); const c = W.CATS[pi.i]; toast(`🐱 ${c.name}${pi.owner ? `가 ${clip(pi.owner, 10)}님과` : "가 누군가와"} 산책 중이에요 💕`); catPetted(pi.i); } }
     if (a === "court:bb" || a === "ball:bb") bbGoToBall();
     if (a === "schedule") openSched();
     if (a === "thanks") openThanks();
@@ -4849,7 +5129,164 @@ setInterval(() => {
 renderMeChip();
 setInterval(() => { if (document.visibilityState === "visible" && S.room === "yard") loadCookie(); }, 30e3);
 setInterval(() => { if (started) { missionCheck(); renderMissionBits(); } }, 60e3); // 자정이 지나면 새 미션
-if (S.profile) { started = true; joinRoom("yard", "def"); loadMissions().then(() => setTimeout(maybeWelcome, 1200)); } else { W.setRoom("yard"); $$(".panel").forEach((p) => (p.hidden = p.dataset.room !== "yard")); openEntry(true); }
+/* ================= 🧭 사이트 전체 보완 (2026-11-18) ================= */
+// ---- 1) 처음 온 사람 안내 투어 (한 번만, 건너뛸 수 있어요 · 내 캐릭터 → "사용 안내 다시 보기") ----
+const TOUR = [
+  { sel: "#viewport", t: "👋 반가워요!", d: "바닥을 누르면 그곳으로 걸어가요. 화면을 끌면 둘러볼 수 있고, 두 손가락(또는 휠)으로 가까이·멀리 볼 수 있어요." },
+  { sel: ".tabs", t: "🚪 방 옮기기", d: "의자·벤치를 누르면 앉고, 문을 누르면 그 방으로 들어가요. 위 탭을 눌러도 바로 가요." },
+  { sel: "#composer-yard input", t: "💬 말풍선", d: "아래 칸에 지금 상태를 쓰면 내 머리 위에 말풍선으로 보여요. 친구 말풍선을 누르면 반응도 할 수 있어요." },
+  { sel: "#albumBtn", t: "🎯 오늘의 미션", d: "매일 미션 3개를 하면 🎁 선물 상자가 열려요(가끔 ✨ 성경 인물 착장!). 🌱 내 그루터기에서 모은 것과 기록을 봐요." },
+  { sel: ".hud-btn.map-open", t: "🗺 지도", d: "어디에 뭐가 있는지 지도에서 보고, 누르면 그곳으로 바로 가요." },
+  { sel: "#meChip", t: "📱 폰·컴퓨터 같이 쓰기", d: "폰과 컴퓨터를 둘 다 쓰면 내 캐릭터(여기) → '📱 다른 기기와 연결'로 기록을 합칠 수 있어요. 안내는 여기서 다시 볼 수 있어요." },
+];
+let TOURS = null;
+function startTour(after) {
+  TOURS = { i: 0, after };
+  let box = $("#tourBox"); if (!box) { box = h("div", { id: "tourBox", class: "tour" }); document.body.append(box, h("div", { id: "tourRing", class: "tour-ring" })); }
+  renderTour();
+}
+function endTour() { store.set("tourDone", true); const a = TOURS && TOURS.after; TOURS = null; $("#tourBox").hidden = true; $("#tourRing").hidden = true; if (a) setTimeout(a, 400); }
+function renderTour() {
+  const st = TOUR[TOURS.i], box = $("#tourBox"), ring = $("#tourRing"), el = document.querySelector(st.sel);
+  box.hidden = false;
+  box.replaceChildren(h("div", { class: "tour-n", text: `${TOURS.i + 1} / ${TOUR.length}` }), h("b", { text: st.t }), h("p", { text: st.d }),
+    h("div", { class: "tour-btns" }, h("button", { class: "btn ghost sm", text: "건너뛰기", onclick: endTour }),
+      h("button", { class: "btn primary sm", text: TOURS.i === TOUR.length - 1 ? "시작해요 🌱" : "다음 →", onclick: () => { if (TOURS.i < TOUR.length - 1) { TOURS.i++; renderTour(); } else endTour(); } })));
+  const r = el && el.offsetParent !== null ? el.getBoundingClientRect() : null;
+  if (r && st.sel !== "#viewport") {
+    ring.hidden = false; Object.assign(ring.style, { left: r.left - 6 + "px", top: r.top - 6 + "px", width: r.width + 12 + "px", height: r.height + 12 + "px" });
+    const below = r.top < window.innerHeight / 2, bw = Math.min(320, window.innerWidth - 24);
+    Object.assign(box.style, { left: Math.max(12, Math.min(window.innerWidth - bw - 12, r.left + r.width / 2 - bw / 2)) + "px", top: below ? r.bottom + 14 + "px" : "auto", bottom: below ? "auto" : window.innerHeight - r.top + 14 + "px", transform: "none" });
+  } else { ring.hidden = true; Object.assign(box.style, { left: "50%", top: "40%", bottom: "auto", transform: "translate(-50%,-50%)" }); }
+}
+window.addEventListener("resize", () => { if (TOURS) renderTour(); });
+
+// ---- 2) 혼자 있을 때: 이 방에 남은 흔적 ----
+const ROOM_FP = { yard: "yard", worship: "worship", cafe: "cafe", vision: "vision", room301: "room301", praise: "praise" };
+function renderAlone() {
+  let el = $("#aloneCard");
+  const others = S.peers.filter((p) => p.id !== myId), fr = ROOM_FP[S.room];
+  if (!started || others.length || !fr || !FPS.ok || TOURS) { if (el) el.hidden = true; return; }
+  const mine = clip(S.profile?.name, LIMIT.name) || "";
+  const list = FPS.list.filter((f) => f.room === fr && (f.name || "") !== mine).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  const t = FPS.list.filter((f) => f.room === fr && isToday(f.created_at)), pray = t.filter((f) => f.kind === "pray").length, read = t.filter((f) => f.kind === "read").length;
+  if (!el) { el = h("div", { id: "aloneCard", class: "alone-card" }); $("#viewport").append(el); }
+  const last = list[0];
+  const key = [S.room, last && last.id, pray, read].join("|"); if (el.dataset.key === key && !el.hidden) return; el.dataset.key = key;
+  el.replaceChildren(...[h("b", { text: "🌱 지금은 나 혼자 있어요" }),
+    h("span", { text: last ? `마지막으로 ${last.name || "익명"}님이 ${timeAgo(last.created_at)} ${last.kind === "pray" ? "기도하고 갔어요" : last.kind === "read" ? "말씀 읽고 갔어요" : "다녀갔어요"}` : "이 방의 첫 발자취를 남겨 봐요" }),
+    pray || read ? h("span", { text: `오늘 이 방: ${pray ? `🙏 기도 ${pray}` : ""}${pray && read ? " · " : ""}${read ? `📖 말씀 ${read}장` : ""}` }) : null,
+    h("button", { class: "btn ghost sm", text: "👣 발자취 보기", onclick: () => $("#dashBtn").click() }),
+    h("button", { class: "x", text: "✕", title: "닫기", onclick: () => { el.hidden = true; el.dataset.closed = S.room; } })].filter(Boolean));
+  el.hidden = el.dataset.closed === S.room;
+}
+setInterval(renderAlone, 3000);
+
+// ---- 3) 서버(Supabase)가 잠들었거나 연결이 안 될 때 안내 ----
+async function serverCheck() {
+  if (!CFG.supabaseUrl || !CFG.supabaseKey) return; // 키가 없으면 원래 데모 모드
+  let ok = !!window.supabase;
+  if (ok) {
+    try {
+      const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 9000);
+      const r = await fetch(CFG.supabaseUrl.replace(/\/$/, "") + "/rest/v1/site_settings?select=key&limit=1", { headers: { apikey: CFG.supabaseKey, Authorization: "Bearer " + CFG.supabaseKey }, signal: ctl.signal });
+      clearTimeout(tm); ok = r.status < 500;
+    } catch (e) { ok = false; }
+  }
+  let b = $("#serverBanner");
+  if (ok) { if (b) b.hidden = true; return; }
+  if (!b) { b = h("div", { id: "serverBanner", class: "server-banner" }); document.body.prepend(b); }
+  b.replaceChildren(h("b", { text: "⚠️ 지금 서버에 연결이 안 돼요" }), h("span", { text: window.supabase ? " 서버가 잠들어 있거나 인터넷이 불안정해요. 잠시 뒤 새로고침해 주세요. 계속되면 관리자에게 알려 주세요 (관리자: Supabase 대시보드에서 프로젝트 Restore)." : " 연결 도구를 불러오지 못했어요. 인터넷을 확인하고 새로고침해 주세요." }),
+    h("button", { class: "btn ghost sm", text: "새로고침", onclick: () => location.reload() }));
+  b.hidden = false;
+}
+serverCheck();
+
+// ---- 4) 느린 폰이면 🪶 가볍게 보기를 알아서 켜요 (한 번만) ----
+(function autoLite() {
+  if (store.get("lite", false) || store.get("autoLiteDone", false)) return;
+  let n = 0, t0 = 0, slow = 0;
+  const step = (t) => {
+    if (document.visibilityState !== "visible" || !started) { t0 = 0; n = 0; requestAnimationFrame(step); return; }
+    if (!t0) t0 = t; n++;
+    const dt = t - t0;
+    if (dt > 4000) { const fps = (n * 1000) / dt; slow = fps < 22 ? slow + 1 : 0; t0 = t; n = 0;
+      if (slow >= 2) { store.set("autoLiteDone", true); setLite(true, true); toast("🪶 화면이 느려서 가볍게 보기를 켰어요 (오른쪽 위 🪶로 끌 수 있어요)"); return; }
+      if (performance.now() > 40000) { store.set("autoLiteDone", true); return; } }
+    requestAnimationFrame(step);
+  };
+  setTimeout(() => requestAnimationFrame(step), 6000);
+})();
+
+// ---- 5) 📱 기기 연결 코드 ----
+function openLink(intro) {
+  const body = $("#linkBody"); let tmr = null;
+  const codeBox = h("div", { class: "link-code", hidden: true });
+  const mk = h("button", { class: "btn primary", text: "🔢 연결 코드 만들기", onclick: async () => {
+    mk.disabled = true;
+    try {
+      const code = String(await api.deviceCodeMake()), until = Date.now() + 600e3;
+      codeBox.hidden = false; clearInterval(tmr);
+      const draw = () => { const left = Math.max(0, Math.ceil((until - Date.now()) / 1000)); codeBox.replaceChildren(h("b", { text: code.replace(/(\d{3})(\d{3})/, "$1 $2") }), h("small", { text: left ? `다른 기기에서 이 숫자를 넣어 주세요 · ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")} 남음` : "시간이 지났어요. 다시 만들어 주세요" })); if (!left) { clearInterval(tmr); mk.disabled = false; } };
+      draw(); tmr = setInterval(() => { if ($("#linkModal").hidden) clearInterval(tmr); else draw(); }, 1000);
+    } catch (e) { toast("코드를 만들지 못했어요: " + e.message); mk.disabled = false; }
+  } });
+  const inp = h("input", { class: "link-input", inputmode: "numeric", maxlength: 7, placeholder: "123 456", autocomplete: "off" });
+  let armed = false;
+  const go = h("button", { class: "btn primary", text: "연결하기", onclick: async () => {
+    const code = inp.value.replace(/\D/g, "");
+    if (code.length !== 6) return toast("6자리 숫자를 넣어 주세요");
+    if (!armed) { armed = true; go.textContent = "정말 연결할게요"; warn.hidden = false; return; }
+    go.disabled = true;
+    try {
+      const r = await api.deviceLink(code);
+      if (r && r.error) throw new Error(r.error);
+      if (!r || !r.token) throw new Error("연결하지 못했어요");
+      store.set("token", r.token); store.set("readSync1", false); localStorage.removeItem("oc_mlog");
+      if (r.name && S.profile && !S.profile.name) { S.profile.name = r.name; store.set("profile", S.profile); }
+      toast("📱 연결됐어요! 기록을 합쳐서 다시 불러올게요"); setTimeout(() => location.reload(), 1500);
+    } catch (e) { toast(e.message); go.disabled = false; armed = false; go.textContent = "연결하기"; }
+  } });
+  const warn = h("p", { class: "link-warn", hidden: true, text: "이 기기의 기록이 코드를 만든 기기로 합쳐지고, 앞으로 두 기기는 같은 사람으로 기록돼요. 한 번 더 누르면 연결해요." });
+  body.replaceChildren(...[
+    intro ? h("p", { class: "link-intro", text: intro }) : null,
+    h("p", { class: "muted", text: "폰과 컴퓨터(또는 아이폰 홈 화면 앱과 사파리)를 같이 쓰면 기록이 따로 쌓여요. 한 번 연결하면 미션·통독·랭킹 기록이 합쳐져요." }),
+    h("div", { class: "link-step" }, h("b", { text: "① 원래 쓰던 기기에서" }), h("p", { class: "muted tiny", text: "기록이 많은 기기에서 코드를 만들어요" }), mk, codeBox),
+    h("div", { class: "link-step" }, h("b", { text: "② 새 기기(지금 이 기기)에서" }), h("p", { class: "muted tiny", text: "①에서 나온 6자리 숫자를 넣어요" }), h("div", { class: "link-row" }, inp, go), warn),
+    h("p", { class: "muted tiny", text: "🔒 코드는 10분만 쓸 수 있어요. 다른 사람에게 알려 주지 마세요." }),
+    api.demo ? h("p", { class: "muted tiny", text: "데모 모드에서는 같은 브라우저 안에서만 흉내 내요." }) : null].filter(Boolean));
+  openModal("linkModal");
+}
+async function linkPromptCheck() {
+  if (store.get("linkAsked", false) || api.demo) return;
+  const few = Object.keys(MS.log || {}).length <= 1;
+  if (!few) { store.set("linkAsked", true); return; }
+  const standalone = (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone;
+  let intro = null;
+  if (standalone) intro = "📱 사파리나 다른 기기에서 쓰던 기록이 있나요? 연결하면 미션·통독 기록이 이어져요.";
+  else if (S.profile?.name) { try { if (await api.nameKnown(clip(S.profile.name, LIMIT.name))) intro = `혹시 다른 기기에서 쓰던 ${clip(S.profile.name, LIMIT.name)}님이세요? 원래 기기에서 코드를 만들면 기록을 합칠 수 있어요.`; } catch (e) {} }
+  if (!intro) return;
+  store.set("linkAsked", true);
+  setTimeout(() => { if (!$("#welcomeModal").hidden) { const iv = setInterval(() => { if ($("#welcomeModal").hidden) { clearInterval(iv); openLink(intro); } }, 800); } else openLink(intro); }, 600);
+}
+$("#linkBtn").onclick = () => { closeModal("entryModal"); preview && preview.stop(); openLink(); };
+$("#tourAgainBtn").onclick = () => { closeModal("entryModal"); preview && preview.stop(); startTour(); };
+
+// ---- 6) 관리자 요약판 ----
+async function renderAdminSummary(pw) {
+  const box = $("#adminSummary"); if (!box) return;
+  box.replaceChildren(h("p", { class: "muted tiny", text: "이번 주 숫자를 불러오는 중…" }));
+  try {
+    const d = await api.adminSummary(pw); if (!d) { box.replaceChildren(); return; }
+    const cell = (e, n, l, warn) => h("div", { class: "sum-cell" + (warn && n ? " warn" : "") }, h("b", { text: `${e} ${n == null ? "-" : Number(n).toLocaleString()}` }), h("span", { text: l }));
+    box.replaceChildren(h("div", { class: "board-label", text: "📊 이번 주 한눈에 (최근 7일)" }),
+      h("div", { class: "sum-grid" }, cell("👥", d.visitors7, "다녀간 사람"), cell("🌱", d.today, "오늘 다녀간 사람"), cell("🙏", d.prayers7, "기도"), cell("📖", d.reads7, "읽은 장"),
+        cell("✅", d.stamps7, "미션 다 한 날"), cell("🧀", d.orders_new, "새 주문 (확인 전)", true), cell("🛒", d.orders_week, "이번 주 주문"), cell("🚩", d.reports, "신고된 방명록", true),
+        cell("📅", d.events_next, "2주 안 모임"), cell("🗓", d.members30, "30일 동안 온 사람")));
+  } catch (e) { box.replaceChildren(h("p", { class: "muted tiny", text: "요약을 불러오지 못했어요: " + e.message })); }
+}
+
+if (S.profile) { started = true; joinRoom("yard", "def"); loadMissions().then(() => setTimeout(() => { maybeWelcome(); linkPromptCheck(); }, 1200)); } else { W.setRoom("yard"); $$(".panel").forEach((p) => (p.hidden = p.dataset.room !== "yard")); openEntry(true); }
 loadFootprints();
 
 })();
