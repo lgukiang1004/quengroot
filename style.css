@@ -1069,7 +1069,7 @@ body.jamming #composer-praise { display: none; }
 .habit-grid span { aspect-ratio: 1; display: grid; place-items: center; border-radius: 8px; background: #f2ecdc; color: #a08a64; font-size: 12px; font-weight: 700; }
 .habit-grid span.on { background: #6fae55; color: #fff; } .habit-grid span.today { box-shadow: inset 0 0 0 2px #e0a92a; } .habit-grid span.miss { background: #e6dcc4; }
 .habit-done { background: #fff1b8; border-radius: 10px; padding: 8px 12px; font-weight: 700; }
-.fun-pop { top: 104px !important; z-index: 15; }
+.fun-pop { top: 104px; z-index: 15; }
 .ord-days p { grid-column: 1 / -1; margin: 0; }
 .my-orders li button { justify-self: start; }
 .habit-grid { max-width: 360px; margin: 12px auto; }
@@ -1099,5 +1099,6 @@ body.jamming #composer-praise { display: none; }
   .walk-hud { top: auto; bottom: 8px; font-size: 12.5px; padding: 4px 6px 4px 4px; max-width: calc(100% - 16px); }
   .walk-hud .wh-arrow { width: 26px; height: 26px; font-size: 16px; }
   .walk-card { width: calc(100% - 16px); }
-  .fun-pop { top: 108px !important; z-index: 16; }
+  .fun-pop { top: 108px; z-index: 16; }
 }
+

@@ -5559,6 +5559,24 @@ function stackBars() {
   const zc = $("#zoneChip"); if (zc) zc.classList.toggle("under-bars", any);
   const t = $("#toast"); if (t) { const vb = window.innerHeight - vp.getBoundingClientRect().bottom; t.style.bottom = Math.round(Math.max(0, vb) + y + (any ? 8 : 48)) + "px"; } // 알림은 막대·구역 이름 바로 위에
 }
+// 위쪽도 쌓기: 오른쪽 위 버튼들 아래에 "지금 모여요" → 음악 플레이어 → 사람 목록·놀기 창 차례로 (겹치지 않게)
+function stackTop() {
+  const vp = $("#viewport"); if (!vp) return;
+  const mobile = window.innerWidth <= 720, vr = vp.getBoundingClientRect(), rel = (el) => { const r = el.getBoundingClientRect(); return { top: r.top - vr.top, bottom: r.bottom - vr.top, left: r.left - vr.left, right: r.right - vr.left }; };
+  const vis = (el) => el && !el.hidden && el.offsetHeight > 0 && getComputedStyle(el).display !== "none";
+  const hud = $(".hud"), gb = $("#gatherBar");
+  let y = (vis(hud) ? rel(hud).bottom : 0) + 8;
+  if (mobile) { // 폰: 왼쪽 위 "지금 모여요"와 게시판 제목 아래부터
+    const ph = $(".panel:not([hidden]) .panel-head"); if (vis(gb)) y = Math.max(y, rel(gb).bottom + 8); if (vis(ph)) y = Math.max(y, rel(ph).bottom + 8);
+  } else if (vis(gb)) { gb.style.top = y + "px"; y = rel(gb).top + gb.offsetHeight + 8; }
+  for (const id of ["cdPlayer", "listenPlayer", "peoplePop", "funPop"]) {
+    const el = document.getElementById(id); if (!vis(el)) continue;
+    el.style.top = y + "px"; y += el.offsetHeight + 8;
+    if (id === "peoplePop" || id === "funPop") el.style.maxHeight = Math.max(160, vr.height - parseFloat(el.style.top) - 12) + "px";
+  }
+}
+setInterval(stackTop, 150);
+window.addEventListener("resize", stackTop);
 setInterval(stackBars, 150);
 window.addEventListener("resize", stackBars);
 
