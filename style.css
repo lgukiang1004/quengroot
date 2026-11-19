@@ -415,8 +415,8 @@ input, select, textarea { font-family: inherit; font-size: 16px; color: var(--in
 .sport-bar .sb-t { line-height: 1.4; }
 .sport-bar .btn.ghost { background: rgba(255,255,255,.16); color: #fff; }
 .sport-bar .btn[disabled] { opacity: .5; }
-.viewport:has(.sport-bar:not([hidden])) .carry-bar { bottom: 64px; }
-@media (max-width: 720px) { .sport-bar { bottom: 8px; font-size: 12px; padding: 5px 6px 5px 10px; } .viewport:has(.sport-bar:not([hidden])) .carry-bar { bottom: 70px; } }
+
+@media (max-width: 720px) { .sport-bar { bottom: 8px; font-size: 12px; padding: 5px 6px 5px 10px; }  }
 
 /* ---------- 함께하는 기능: 모임 · 설교 · 챌린지 · 감사 나무 · 알림 ---------- */
 .gather-bar { position: absolute; right: 12px; top: 56px; z-index: 12; background: #fff4d6; border: 1px solid #f1d58a; color: #6a4a10; border-radius: 999px; box-shadow: var(--shadow); padding: 6px 8px 6px 14px; display: flex; gap: 6px; align-items: center; font-size: 13.5px; max-width: min(420px, calc(100% - 24px)); animation: pop .3s ease-out; }
@@ -647,8 +647,9 @@ body.jamming #composer-praise { display: none; }
 .mc-season { background: #fff3d6; color: #8a5a10; font-weight: 700; }
 .mc-album { background: transparent; color: var(--accent-dark); padding: 4px 2px 0; }
 .show-strip { background: linear-gradient(90deg, #d9483b, #e8693d); color: #fff7e0; font-weight: 700; margin: 4px 0 8px; }
-.album-seg { width: 100%; margin-bottom: 10px; flex-wrap: wrap; }
-.album-seg .seg-btn { flex: 1; }
+.album-seg { width: 100%; margin-bottom: 10px; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; box-sizing: border-box; }
+.album-seg::-webkit-scrollbar { display: none; }
+.album-seg .seg-btn { flex: 0 0 auto; white-space: nowrap; } /* 탭 글씨는 한 줄로 · 넘치면 옆으로 밀어서 봐요 */
 .album-body .board-label { margin-top: 12px; }
 .al-streak { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .al-streak > div { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 8px 4px; text-align: center; }
@@ -1074,7 +1075,7 @@ body.jamming #composer-praise { display: none; }
 .habit-grid { max-width: 360px; margin: 12px auto; }
 .ver-warn { position: fixed; left: 0; right: 0; top: 0; z-index: 9999; background: #d9483b; color: #fff; font-weight: 700; padding: 10px 14px; text-align: center; font-size: 14px; }
 .roast-bar.skip-bar { background: linear-gradient(90deg, #cfe3ef 0%, #cfe3ef 62%, #6fae55 62%, #6fae55 78%, #cfe3ef 78%); }
-.listen-bar { bottom: 64px; background: rgba(46,42,80,.94); }
+.listen-bar { background: rgba(46,42,80,.94); }
 
 /* 🎵 음악 플레이어: 기본은 작게 (폰에서 화면을 안 가리게) · ⤢로 크게 */
 .cd-player.mini { width: 230px; display: grid; grid-template-columns: 88px 1fr; column-gap: 8px; align-items: center; padding: 5px 6px; top: 104px; }
@@ -1090,4 +1091,13 @@ body.jamming #composer-praise { display: none; }
   .cd-player.mini { top: 116px; bottom: auto; left: 8px; right: auto; width: 200px; grid-template-columns: 72px 1fr; }
   .cd-player.mini .cd-frame iframe { width: 72px !important; height: 41px !important; }
   body.jamming .cd-player.mini { top: 50px; }
+}
+
+/* 📱 2026-11-19: 막대가 있으면 왼쪽 아래 구역 이름은 숨겨요 · 폰에서 산책 퀘스트는 아래 줄로 */
+.zone-chip.under-bars { display: none; }
+@media (max-width: 720px) {
+  .walk-hud { top: auto; bottom: 8px; font-size: 12.5px; padding: 4px 6px 4px 4px; max-width: calc(100% - 16px); }
+  .walk-hud .wh-arrow { width: 26px; height: 26px; font-size: 16px; }
+  .walk-card { width: calc(100% - 16px); }
+  .fun-pop { top: 108px !important; z-index: 16; }
 }

@@ -6,7 +6,7 @@ const VERSES = window.VERSES || [];
 const BOOKS = window.BOOKS || [];
 const W = window.World;
 // 🔖 world.js가 같이 올라갔는지 확인 (깃허브에 app.js만 올라가고 world.js가 옛날 것이면 지도·뒷마당이 안 바뀌어요)
-const WORLD_VER = "2026-11-18n";
+const WORLD_VER = "2026-11-19a";
 if (!W || W.ver !== WORLD_VER) setTimeout(() => { const b = document.createElement("div"); b.className = "ver-warn"; b.textContent = `⚠️ 사이트 파일이 덜 올라갔어요: world.js가 옛날 버전이에요 (지금 ${W && W.ver ? W.ver : "옛날 것"} · 필요한 것 ${WORLD_VER}). 깃허브에 world.js를 다시 올려 주세요.`; document.body.append(b); }, 1500);
 const LIMIT = { bubble: 80, status: 60, wall: 200, name: 12 };
 // 코드 안의 방 이름: yard = 마당, worship = 본당(기도하는 공간), cafe = 성경 읽는 공간, vision = 비전, room301 = 301호, praise = 찬양팀 연습실(리빙리버)
@@ -5540,6 +5540,27 @@ function openPlanView() {
 // 하루 분량을 다 읽으면 미션 기록
 function planTick() { const st = planState(); if (!st) return; const p = st.days[Math.min(st.dayN, st.days.length - 1)]; if (p && st.isDone(p)) mAdd("plan"); renderPlanCard(); }
 setInterval(() => { if (started && S.room === "cafe") planTick(); }, 10e3);
+
+/* ================= 📱 아래 막대들 쌓기 (2026-11-19) =================
+   화면 아래 막대(돗자리·캠프파이어·호숫가·스케이트·농구·간식·청음회 같이 듣기·말씀 카드)가 여러 개 떠도 겹치지 않게
+   아래에서부터 차례로 쌓아요. 폰에서는 산책 퀘스트 표시도 위 대신 이 줄에 들어가요. 막대가 있으면 왼쪽 아래 구역 이름은 숨겨요. */
+const STACK_IDS = ["sportBar", "skateBar", "fireBar", "lakeBar", "matBar", "carryBar", "listenBar", "walkHud", "walkCard"];
+function stackBars() {
+  const vp = $("#viewport"); if (!vp) return;
+  const mobile = window.innerWidth <= 720;
+  let y = mobile ? 8 : 10, any = false;
+  for (const id of STACK_IDS) {
+    const el = document.getElementById(id); if (!el) continue;
+    if (id === "walkHud" && !mobile) { el.style.bottom = ""; el.style.top = ""; continue; } // 넓은 화면은 위쪽 그대로
+    if (el.hidden || el.offsetHeight === 0) continue;
+    if (id === "walkHud") el.style.top = "auto";
+    el.style.bottom = y + "px"; y += el.offsetHeight + 6; any = true;
+  }
+  const zc = $("#zoneChip"); if (zc) zc.classList.toggle("under-bars", any);
+  const t = $("#toast"); if (t) { const vb = window.innerHeight - vp.getBoundingClientRect().bottom; t.style.bottom = Math.round(Math.max(0, vb) + y + (any ? 8 : 48)) + "px"; } // 알림은 막대·구역 이름 바로 위에
+}
+setInterval(stackBars, 150);
+window.addEventListener("resize", stackBars);
 
 /* ================= 🧺 돗자리 자세 (청음회 잔디밭) ================= */
 const MAT_POSES = [["sit", "🧘 앉기"], ["prone", "🛌 엎드리기"], ["stand", "🧍 서기"], ["lie", "😴 눕기"]];
