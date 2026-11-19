@@ -1777,7 +1777,7 @@ function makeRoadCars(s) {
   const list = [];
   CAR_LANES.forEach((L, li) => L.cols.forEach((c, i) => {
     const car = makeCar(c, (li + i) % 3 === 2 ? "van" : "car");
-    car.g.rotation.y = L.dir > 0 ? 0 : Math.PI;
+    car.g.rotation.y = L.dir > 0 ? 0 : Math.PI; car.g.userData.noCam = true; // 지나가는 차는 카메라가 피하지 않아요
     s.add(car.g);
     list.push({ ...car, lane: L, off: L.gaps[i] * ROAD_END * 2 });
   }));
@@ -3485,7 +3485,7 @@ function buildPraise() {
 // 누운 자세 회전: 몸(위쪽) → 소파 길이 방향, 얼굴(앞쪽) → 하늘
 const LIE_Q = new T.Quaternion().setFromRotationMatrix(new T.Matrix4().makeBasis(new T.Vector3(0, 0, 1), new T.Vector3(1, 0, 0), new T.Vector3(0, 1, 0)));
 const World = {
-  ver: "2026-11-18m", // 🔖 app.js의 WORLD_VER와 같아야 해요 (다르면 화면 위에 '파일이 덜 올라갔어요' 안내)
+  ver: "2026-11-18n", // 🔖 app.js의 WORLD_VER와 같아야 해요 (다르면 화면 위에 '파일이 덜 올라갔어요' 안내)
   LOOK, safeLook, makeCharacter, poseCharacter,
   renderer: null, camera: null, rooms: {}, room: null, roomName: null,
   actors: new Map(), hooks: null, el: null, overlay: null,
@@ -3782,14 +3782,15 @@ const World = {
     if (r._camCol) return r._camCol;
     const list = [], bx = new T.Box3(), sz = new T.Vector3();
     r.scene.updateMatrixWorld(true);
+    const skip = (o) => { for (let p = o; p; p = p.parent) if (p.userData && (p.userData.noCam || p.userData.actor)) return true; return false; };
     r.scene.traverse((o) => {
       if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh) return;
-      if (o.userData.actor || o.userData.noCam) return;
+      if (skip(o)) return; // 지나가는 차·사람은 빼요 (예전엔 차가 지나갈 때마다 카메라가 당겨졌다 풀렸다 했음)
       const m = Array.isArray(o.material) ? o.material[0] : o.material;
       if (!m || m.transparent || m.opacity < 1) return;
       bx.setFromObject(o); bx.getSize(sz);
-      if (sz.y < 0.5 || Math.max(sz.x, sz.z) > 70) return; // 땅·길·돗자리 같은 납작한 것, 아주 큰 것(하늘)은 빼요
-      if (Math.max(sz.x, sz.y, sz.z) < 1.2) return;           // 작은 물건은 빼요
+      if (sz.y < 0.8 || Math.max(sz.x, sz.z) > 70) return;            // 땅·길·돗자리처럼 납작한 것, 하늘처럼 아주 큰 것
+      if (Math.max(sz.x, sz.y, sz.z) < 2.0 || Math.min(sz.x, sz.z) < 0.25) return; // 작은 물건 · 가는 기둥·줄
       list.push(o);
     });
     r._camCol = list; return list;
@@ -4503,8 +4504,12 @@ const World = {
         const dir = this._camDir || (this._camDir = new T.Vector3()); dir.set(px - tg.x, py - tg.y, pz - tg.z).normalize();
         const rc = this._camRay || (this._camRay = new T.Raycaster()); rc.set(tg, dir); rc.near = 0.2; rc.far = want;
         const hit = rc.intersectObjects(cl, false).find((h) => h.object.visible && (!h.object.parent || h.object.parent.visible));
-        let d = hit ? Math.max(0.7, hit.distance - 0.35) : want;
-        this._camD = this._camD == null ? d : d < this._camD ? d : this._camD + (d - this._camD) * Math.min(1, dt * 3); // 막히면 바로, 풀리면 천천히
+        const d = hit ? Math.max(1.2, hit.distance - 0.35) : want;
+        // 부드럽게: 막히면 빨리(그래도 한 번에 툭 튀지 않게), 풀리면 0.6초 기다렸다가 천천히 (폰에서 커졌다 작아졌다 반복 방지)
+        if (this._camD == null) this._camD = want;
+        if (d < this._camD - 0.05) { this._camD += (d - this._camD) * Math.min(1, dt * 10); this._camFree = 0; }
+        else { this._camFree = (this._camFree || 0) + dt; if (this._camFree > 0.6) this._camD += (Math.min(d, want) - this._camD) * Math.min(1, dt * 1.5); }
+        this._camD = Math.min(this._camD, want);
         if (this._camD < want - 0.01) { px = tg.x + dir.x * this._camD; py = Math.max(0.3, tg.y + dir.y * this._camD); pz = tg.z + dir.z * this._camD; }
       } else this._camD = null;
     }
