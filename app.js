@@ -5691,6 +5691,11 @@ function listenStop() {
 }
 $("#lpClose").onclick = listenStop;
 // 🎵 플레이어는 작게(영상 작은 창) · ⤢ 누르면 크게
+// (index.html이 예전 것이어도 작게 시작하도록 여기서 한 번 더 맞춰요)
+["#cdPlayer", "#listenPlayer"].forEach((sel) => {
+  const p = $(sel); if (!p) return; p.classList.add("mini");
+  if (!p.querySelector(".pl-size")) { const head = p.querySelector(".cd-player-head"), x = head && head.querySelector(".icon-btn:last-child"); if (head) head.insertBefore(h("button", { class: "icon-btn pl-size", title: "영상 크게 보기", text: "⤢" }), x || null); }
+});
 $$(".pl-size").forEach((b) => (b.onclick = () => { const p = b.closest(".cd-player"); const mini = p.classList.toggle("mini"); b.textContent = mini ? "⤢" : "⤡"; b.title = mini ? "영상 크게 보기" : "작게"; }));
 // ---- 청음회 목록 · 예약 ----
 function openListen() { renderListenList(); openModal("listenModal"); loadListen(); }
