@@ -3485,7 +3485,7 @@ function buildPraise() {
 // 누운 자세 회전: 몸(위쪽) → 소파 길이 방향, 얼굴(앞쪽) → 하늘
 const LIE_Q = new T.Quaternion().setFromRotationMatrix(new T.Matrix4().makeBasis(new T.Vector3(0, 0, 1), new T.Vector3(1, 0, 0), new T.Vector3(0, 1, 0)));
 const World = {
-  ver: "2026-11-18n", // 🔖 app.js의 WORLD_VER와 같아야 해요 (다르면 화면 위에 '파일이 덜 올라갔어요' 안내)
+  ver: "2026-11-19a", // 🔖 app.js의 WORLD_VER와 같아야 해요 (다르면 화면 위에 '파일이 덜 올라갔어요' 안내)
   LOOK, safeLook, makeCharacter, poseCharacter,
   renderer: null, camera: null, rooms: {}, room: null, roomName: null,
   actors: new Map(), hooks: null, el: null, overlay: null,
@@ -3788,6 +3788,7 @@ const World = {
       if (skip(o)) return; // 지나가는 차·사람은 빼요 (예전엔 차가 지나갈 때마다 카메라가 당겨졌다 풀렸다 했음)
       const m = Array.isArray(o.material) ? o.material[0] : o.material;
       if (!m || m.transparent || m.opacity < 1) return;
+      const gt = o.geometry && o.geometry.type; if (/Icosahedron|Sphere|Dodecahedron|Cone/.test(gt || "")) return; // 나뭇잎·덤불·돌·트리는 빼요
       bx.setFromObject(o); bx.getSize(sz);
       if (sz.y < 0.8 || Math.max(sz.x, sz.z) > 70) return;            // 땅·길·돗자리처럼 납작한 것, 하늘처럼 아주 큰 것
       if (Math.max(sz.x, sz.y, sz.z) < 2.0 || Math.min(sz.x, sz.z) < 0.25) return; // 작은 물건 · 가는 기둥·줄
@@ -4503,9 +4504,14 @@ const World = {
       if (cl.length && want > 0.5) {
         const dir = this._camDir || (this._camDir = new T.Vector3()); dir.set(px - tg.x, py - tg.y, pz - tg.z).normalize();
         const rc = this._camRay || (this._camRay = new T.Raycaster()); rc.set(tg, dir); rc.near = 0.2; rc.far = want;
-        const hit = rc.intersectObjects(cl, false).find((h) => h.object.visible && (!h.object.parent || h.object.parent.visible));
-        const d = hit ? Math.max(1.2, hit.distance - 0.35) : want;
-        // 부드럽게: 막히면 빨리(그래도 한 번에 툭 튀지 않게), 풀리면 0.6초 기다렸다가 천천히 (폰에서 커졌다 작아졌다 반복 방지)
+        // 카메라 자리가 건물·물건 "안"에 들어갈 때만 당겨요 (가리기만 하는 건 그대로 둬요 → 혼자 커졌다 작아졌다 안 해요)
+        const cpt = this._camPt || (this._camPt = new T.Vector3()); cpt.set(px, py, pz);
+        let d = want;
+        for (const h of rc.intersectObjects(cl, false)) {
+          const o = h.object; if (!o.visible || (o.parent && !o.parent.visible)) continue;
+          const bb = o.userData._camBox || (o.userData._camBox = new T.Box3().setFromObject(o).expandByScalar(0.25));
+          if (bb.containsPoint(cpt)) { d = Math.max(1.2, h.distance - 0.35); break; }
+        }
         if (this._camD == null) this._camD = want;
         if (d < this._camD - 0.05) { this._camD += (d - this._camD) * Math.min(1, dt * 10); this._camFree = 0; }
         else { this._camFree = (this._camFree || 0) + dt; if (this._camFree > 0.6) this._camD += (Math.min(d, want) - this._camD) * Math.min(1, dt * 1.5); }
