@@ -6,7 +6,7 @@ const VERSES = window.VERSES || [];
 const BOOKS = window.BOOKS || [];
 const W = window.World;
 // 🔖 world.js가 같이 올라갔는지 확인 (깃허브에 app.js만 올라가고 world.js가 옛날 것이면 지도·뒷마당이 안 바뀌어요)
-const WORLD_VER = "2026-11-18l";
+const WORLD_VER = "2026-11-18m";
 if (!W || W.ver !== WORLD_VER) setTimeout(() => { const b = document.createElement("div"); b.className = "ver-warn"; b.textContent = `⚠️ 사이트 파일이 덜 올라갔어요: world.js가 옛날 버전이에요 (지금 ${W && W.ver ? W.ver : "옛날 것"} · 필요한 것 ${WORLD_VER}). 깃허브에 world.js를 다시 올려 주세요.`; document.body.append(b); }, 1500);
 const LIMIT = { bubble: 80, status: 60, wall: 200, name: 12 };
 // 코드 안의 방 이름: yard = 마당, worship = 본당(기도하는 공간), cafe = 성경 읽는 공간, vision = 비전, room301 = 301호, praise = 찬양팀 연습실(리빙리버)
@@ -5149,11 +5149,11 @@ function walkToday() {
   const V = window.VERSES || [], N = V.length, base = dIdx(d) * 7;
   const verses = []; for (let i = 0; i < 7 && N; i++) { const v = V[(base + i * 47) % N]; verses.push({ text: v.text, ref: v.ref, b: v.b, c: v.c }); }
   const st = store.get("walkDay", null);
-  Object.assign(WALKS, { d, verses, q: WALK_Q[dIdx(d) % WALK_Q.length], done: st && st.d === d ? st.n : 0, asked: st && st.d === d ? !!st.asked : false });
+  Object.assign(WALKS, { d, verses, q: WALK_Q[dIdx(d) % WALK_Q.length], done: st && st.d === d ? st.n : 0, asked: st && st.d === d ? !!st.asked : false, started: st && st.d === d ? !!st.st || st.n > 0 : false });
   W.setWalk(verses, WALKS.done);
   return WALKS;
 }
-function walkSave() { store.set("walkDay", { d: WALKS.d, n: WALKS.done, asked: WALKS.asked }); W.setWalk(null, WALKS.done); }
+function walkSave() { store.set("walkDay", { d: WALKS.d, n: WALKS.done, asked: WALKS.asked, st: !!WALKS.started }); W.setWalk(null, WALKS.done); }
 // 2026-11-18 오후: 팻말 "앞에 서야" 말씀이 펼쳐져요 · 입구에서 게임처럼 사용 설명 · 화면 위 퀘스트 표시 + 화살표 · 🏁 끝 팻말에서 오늘의 질문
 function walkCardShow(i, note) {
   const c = $("#walkCard"), v = WALKS.verses[i]; if (!v) return;
@@ -5181,11 +5181,13 @@ function walkTick() {
   // 입구 (시작 아치) 근처: 오늘 처음이면 게임처럼 사용 설명
   const dStart = Math.hypot(me.x - W.WALK.start.x, me.z - W.WALK.start.z);
   if (dStart < 3.2 && store.get("walkIntro", "") !== WALKS.d && !WALKS.asked) { store.set("walkIntro", WALKS.d); openWalkHelp(); }
+  if (dStart < 3.2 && !WALKS.started) { WALKS.started = true; walkSave(); } // 입구(시작 아치)를 지나야 시작
+  if (WALKS.done > 0) WALKS.started = true;
   // 팻말 앞에 섰나?
   let near = -1;
   S7.forEach((sg, i) => { if (Math.hypot(me.x - sg.x, me.z - sg.z) < SIGN_NEAR) near = i; });
-  if (near >= 0) {
-    WALKS.started = true;
+  if (near >= 0 && !WALKS.started) { if (WALKS.hintAt !== "start") { WALKS.hintAt = "start"; toast("🌿 말씀 산책은 입구(시작 아치 🌿)에서 시작해요 · 화살표를 따라가요"); WALKS.hudOff = false; } }
+  else if (near >= 0) {
     if (near === WALKS.done) { WALKS.done++; walkSave(); }
     if (near < WALKS.done) {
       if (WALKS.cardFor !== near && WALKS.closedFor !== near) walkCardShow(near, near === WALKS.done - 1 ? (WALKS.done === 7 ? "🎉 7개 다 읽었어요! 이제 🏁 끝 팻말로 가요 (화살표를 따라가요)" : `✨ ${WALKS.done}/7 · 화살표를 따라 다음 팻말로 가요`) : "✓ 오늘 읽은 말씀이에요");
@@ -5225,7 +5227,7 @@ function openWalkHelp() {
         h("li", {}, h("b", { text: "순서대로 " }), "— 1번부터 7번까지, 꼬불꼬불 길을 따라 호수를 지나가요"),
         h("li", {}, h("b", { text: "🏁 끝 팻말 " }), "— 마지막에 오늘의 질문 하나에 답하면 🌱 산책 노트에 남아요")),
       h("p", { class: "muted tiny", text: `말씀은 매일 바뀌어요 · 오늘 ${WALKS.done}/7 · 마음에 드는 구절은 🔖 말씀 노트에 담을 수 있어요` })),
-    h("div", { class: "modal-actions" }, h("button", { class: "btn primary", text: WALKS.done ? "▶ 이어서 걷기" : "▶ 시작!", onclick: () => { closeModal("walkModal"); WALKS.started = true; WALKS.hudOff = false; const tg = walkTarget(); if (tg) W.walkTo(tg.x, tg.z + 0.9); } })));
+    h("div", { class: "modal-actions" }, h("button", { class: "btn primary", text: WALKS.done ? "▶ 이어서 걷기" : "▶ 시작!", onclick: () => { closeModal("walkModal"); WALKS.hudOff = false; const me = W.actorPos(myId); if (me && Math.hypot(me.x - W.WALK.start.x, me.z - W.WALK.start.z) < 3.2) { WALKS.started = true; walkSave(); } const tg = walkTarget(); if (tg) W.walkTo(tg.x, tg.z + 0.9); } })));
   openModal("walkModal");
 }
 function openWalkQ() {
@@ -5245,6 +5247,7 @@ function openWalkQ() {
 }
 function openWalkInfo(i) {
   walkToday();
+  if (i != null && !WALKS.started) { toast("🌿 말씀 산책은 입구(시작 아치)에서 시작해요. 입구로 걸어가요"); W.walkTo(W.WALK.start.x, W.WALK.start.z + 0.8); return; }
   if (i != null) { // 팻말을 눌렀을 때: 앞에 서야 펼쳐져요
     const me = W.actorPos(myId), sg = W.WALK.signs[i];
     if (me && sg && Math.hypot(me.x - sg.x, me.z - sg.z) < SIGN_NEAR) { if (i < WALKS.done) walkCardShow(i, "✓ 오늘 읽은 말씀이에요"); return; }
@@ -5666,6 +5669,8 @@ function listenStop() {
   $("#listenBar").dataset.k = ""; renderListenBar();
 }
 $("#lpClose").onclick = listenStop;
+// 🎵 플레이어는 작게(영상 작은 창) · ⤢ 누르면 크게
+$$(".pl-size").forEach((b) => (b.onclick = () => { const p = b.closest(".cd-player"); const mini = p.classList.toggle("mini"); b.textContent = mini ? "⤢" : "⤡"; b.title = mini ? "영상 크게 보기" : "작게"; }));
 // ---- 청음회 목록 · 예약 ----
 function openListen() { renderListenList(); openModal("listenModal"); loadListen(); }
 function listenCard(e) {
@@ -5754,10 +5759,11 @@ const MAP_POI = [
   { k: "walk", x: -32.0, z: 6.6, e: "🐙", t: "타코야끼" },
   { k: "walk", x: -29.2, z: 6.6, e: "🐟", t: "붕어빵" },
   { k: "walk", x: 26.3, z: -8.5, e: "🏀", t: "농구장" },
-  { k: "walk", x: -12.5, z: -25.8, e: "🔥", t: "캠프파이어" },
-  { k: "walk", x: 13.5, z: -21.6, e: "🌿", t: "산책길 시작" },
-  { k: "walk", x: -5.5, z: -41.4, e: "🏁", t: "산책길 끝" },
-  { k: "walk", x: -17.6, z: -39.6, e: "🎶", t: "청음회" },
+  { k: "walk", x: -12.5, z: -25.6, e: "🔥", t: "캠프파이어", dz: 0.6, act: "campfire" },
+  { k: "walk", x: 13.5, z: -21.6, e: "🌿", t: "산책길 시작", dz: 0.8 },
+  { k: "walk", x: -5.5, z: -41.4, e: "🏁", t: "산책길 끝", dz: 1.2 },
+  { k: "walk", x: -17.6, z: -36.2, e: "🎶", t: "청음회", dz: 0.4, act: "listenSpot" },
+  { k: "walk", x: 15.2, z: -39.6, e: "💧", t: "호숫가 · 물수제비", dx: 0, dz: 0.2 },
 ];
 function renderMap() {
   const NS = "http://www.w3.org/2000/svg", svg = document.createElementNS(NS, "svg");
@@ -5767,7 +5773,7 @@ function renderMap() {
   el("rect", { x: 35, y: -36, width: 16, height: 30, fill: "#e4f4fb", stroke: "#fbfbf7", "stroke-width": 0.5, rx: 3 }); // ⛸ 스케이트장
   el("ellipse", { cx: 43, cy: -21, rx: 5.4, ry: 11.8, fill: "none", stroke: "#d9483b", "stroke-width": 0.2 });
   if (W.WALK && W.WALK.at) { const pts = []; for (let k = 0; k <= 60; k++) { const p = W.WALK.at(k / 60); pts.push(p.x.toFixed(2) + "," + p.z.toFixed(2)); } el("polyline", { points: pts.join(" "), fill: "none", stroke: "#e2d4b8", "stroke-width": 1.0, "stroke-linecap": "round", "stroke-linejoin": "round" }); } // 🌿 꼬불꼬불 산책길
-  if (W.LAKE) el("ellipse", { cx: W.LAKE.x, cy: W.LAKE.z, rx: W.LAKE.rx, ry: W.LAKE.rz, fill: "#8cc7e0" }); if (W.LAKE) el("text", { x: W.LAKE.x, y: W.LAKE.z + 0.8, class: "mt", "text-anchor": "middle" }, "💧 호수");
+  if (W.LAKE) el("ellipse", { cx: W.LAKE.x, cy: W.LAKE.z, rx: W.LAKE.rx, ry: W.LAKE.rz, fill: "#8cc7e0" }); 
   el("circle", { cx: W.FIRE.x, cy: W.FIRE.z, r: 3.4, fill: "#e8d9b8" }); el("circle", { cx: W.FIRE.x, cy: W.FIRE.z, r: 0.9, fill: "#ff8a3c" }); // 🔥 캠프파이어
   if (W.LISTEN) el("ellipse", { cx: W.LISTEN.x, cy: W.LISTEN.z, rx: 6.4, ry: 5.2, fill: "#9fd07a" }); if (W.LISTEN) el("rect", { x: W.LISTEN.x - 2.1, y: W.LISTEN.z + 4.4, width: 4.2, height: 0.5, fill: "#2e2a3a" }); // 🎶 청음회 잔디밭
   el("text", { x: 0, y: -43.6, class: "mt", "text-anchor": "middle" }, "🌿 뒷마당 · 산책길 · 캠프파이어 · 청음회");
@@ -5807,9 +5813,10 @@ function renderMap() {
 }
 // 🧭 구역 · ✨ 바로 가기 (2026-11-18): 25m 넘게 먼 곳은 "걸어가기 / 바로 가기"를 골라요. 바로 가기는 그 구역 입구에 반짝 도착한 뒤 걸어가요
 const ZONE_LAND = { play: { x: 26, z: 4.6 }, back: { x: 13.5, z: -21.6 }, food: { x: -30.6, z: 11.6 }, cat: { x: -20.6, z: 0.4 }, front: { x: 0, z: 9.5 } };
-function warpTo(zoneId, then) {
-  const L = ZONE_LAND[zoneId] || ZONE_LAND.front, a = W.me && W.me();
-  W.placeMe(L.x, L.z); S.pos = { x: L.x, z: L.z }; S.seat = null; refreshMe();
+function warpTo(zoneId, then, near) {
+  // near가 있으면 그 장소 바로 앞(2m)에 내려요 (예전엔 구역 입구에 내려서 뒷마당 왼쪽 끝까지 한참 걸었음)
+  const L = near ? { x: near.x + (near.dx || 0), z: near.z + (near.dz != null ? near.dz : 2) } : ZONE_LAND[zoneId] || ZONE_LAND.front, a = W.me && W.me();
+  W.placeMe(L.x, L.z); const pp = W.actorPos(myId) || L; S.pos = { x: pp.x, z: pp.z }; S.seat = null; refreshMe();
   setTimeout(() => { floatAt(myId, "✨", "바로 가기"); if (then) then(); }, 80); void a;
 }
 function askWarp(target, zoneId, label, walk) {
@@ -5818,7 +5825,7 @@ function askWarp(target, zoneId, label, walk) {
   let pop = $("#warpPop"); if (!pop) { pop = h("div", { id: "warpPop", class: "warp-pop" }); document.body.append(pop); }
   pop.replaceChildren(h("b", { text: `${label}까지 멀어요` }),
     h("div", { class: "warp-btns" }, h("button", { class: "btn ghost", text: "🚶 걸어가기", onclick: () => { pop.hidden = true; walk(); } }),
-      h("button", { class: "btn primary", text: "✨ 바로 가기", onclick: () => { pop.hidden = true; warpTo(zoneId, walk); } })),
+      h("button", { class: "btn primary", text: "✨ 바로 가기", onclick: () => { pop.hidden = true; warpTo(zoneId, walk, target.k ? target : null); } })),
     h("button", { class: "x", text: "✕", onclick: () => (pop.hidden = true) }));
   pop.hidden = false;
 }
@@ -5844,7 +5851,8 @@ function mapGo2(poi) {
     if (poi.k === "door") { W.goDoor(poi.to); toast(`${poi.e} ${poi.t}(으)로 가요`); return; }
     if (poi.k === "sled") { W.goSled(); return; }
     if (poi.k === "show") { W.walkTo(poi.x, poi.z); toast("🧀 치즈멜로바이트 쇼룸으로 가요"); setTimeout(openShowroom, 900); return; }
-    W.walkTo(poi.x, poi.z); toast(`${poi.e} ${poi.t}(으)로 가는 중이에요`);
+    W.walkTo(poi.x, poi.z + (poi.dz || 0)); toast(`${poi.e} ${poi.t}(으)로 가는 중이에요`);
+    if (poi.act === "campfire") setTimeout(() => { const me = W.actorPos(myId); if (me && Math.hypot(me.x - W.FIRE.x, me.z - W.FIRE.z) < 6) { const free = Array.from({ length: 8 }, (_, k) => "CF-" + k).filter((id) => W.seatFree(id)); if (free.length) W.sitNear(free, me); } }, 2500);
   };
   if (S.room !== "yard") { joinRoom("yard", S.room); setTimeout(go, 700); } else go();
 }
@@ -6059,7 +6067,8 @@ function renderAlone() {
     h("button", { class: "x", text: "✕", title: "닫기", onclick: () => { el.hidden = true; el.dataset.closed = S.room; } })].filter(Boolean));
   el.hidden = el.dataset.closed === S.room;
 }
-setInterval(renderAlone, 3000);
+// 2026-11-18 저녁: '누가 언제 다녀갔어요' 카드는 폰 화면을 가려서 안 보여요 (궁금하면 👣 발자취에서)
+void renderAlone;
 
 // ---- 3) 서버(Supabase)가 잠들었거나 연결이 안 될 때 안내 ----
 async function serverCheck() {

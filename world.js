@@ -3485,7 +3485,7 @@ function buildPraise() {
 // 누운 자세 회전: 몸(위쪽) → 소파 길이 방향, 얼굴(앞쪽) → 하늘
 const LIE_Q = new T.Quaternion().setFromRotationMatrix(new T.Matrix4().makeBasis(new T.Vector3(0, 0, 1), new T.Vector3(1, 0, 0), new T.Vector3(0, 1, 0)));
 const World = {
-  ver: "2026-11-18l", // 🔖 app.js의 WORLD_VER와 같아야 해요 (다르면 화면 위에 '파일이 덜 올라갔어요' 안내)
+  ver: "2026-11-18m", // 🔖 app.js의 WORLD_VER와 같아야 해요 (다르면 화면 위에 '파일이 덜 올라갔어요' 안내)
   LOOK, safeLook, makeCharacter, poseCharacter,
   renderer: null, camera: null, rooms: {}, room: null, roomName: null,
   actors: new Map(), hooks: null, el: null, overlay: null,
@@ -3777,6 +3777,23 @@ const World = {
   // 🪨 물수제비 던지기 (모두의 화면에서 같은 돌): 던진 사람 위치·방향·튈 횟수
   skipStone(id, x, z, ang, n) { const r = this.rooms.yard; if (!r || !r.backyard || this.roomName !== "yard") return 0; this.prank(id, "push"); return r.backyard.skip(x, z, ang, n); },
   lakeShore(x, z) { const e = Math.hypot((x - LAKE.x) / LAKE.rx, (z - LAKE.z) / LAKE.rz); return e > 0.95 && e < 1.75; },
+  // 카메라가 부딪히는 물건: 크고(폭 1.2m 넘게) 땅바닥이 아닌 것만 (사람·전구·물·잔디는 빼요)
+  camColliders(r) {
+    if (r._camCol) return r._camCol;
+    const list = [], bx = new T.Box3(), sz = new T.Vector3();
+    r.scene.updateMatrixWorld(true);
+    r.scene.traverse((o) => {
+      if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh) return;
+      if (o.userData.actor || o.userData.noCam) return;
+      const m = Array.isArray(o.material) ? o.material[0] : o.material;
+      if (!m || m.transparent || m.opacity < 1) return;
+      bx.setFromObject(o); bx.getSize(sz);
+      if (sz.y < 0.5 || Math.max(sz.x, sz.z) > 70) return; // 땅·길·돗자리 같은 납작한 것, 아주 큰 것(하늘)은 빼요
+      if (Math.max(sz.x, sz.y, sz.z) < 1.2) return;           // 작은 물건은 빼요
+      list.push(o);
+    });
+    r._camCol = list; return list;
+  },
   camYaw() { return this.cam ? this.cam.yaw : 0; },
   FIRE, WALK, ZONES, LISTEN, LAKE,
   // 🎶 청음회 안내판
@@ -3791,7 +3808,7 @@ const World = {
   },
   SHOW, AD, COSTUMES, RINK, FIGURES, onIce, rinkRacePos, rinkLapLen, raceMe: null,
   // 경주가 끝나면 내 캐릭터를 그 자리에 세워요
-  placeMe(x, z) { const a = this.me(); if (!a) return; a.pos.x = x; a.pos.z = z; a.path = []; a.goal = { x, z, seat: null }; a.seat = null; },
+  placeMe(x, z) { const a = this.me(); if (!a) return; if (this.room && this.room.grid) { const p = this.room.grid.nearest(x, z); x = p.x; z = p.z; } a.pos.x = x; a.pos.z = z; a.path = []; a.goal = { x, z, seat: null }; a.seat = null; },
   CATS,
   canLie(seat) { return !!(this.room && seat && this.room.seats[seat] && this.room.seats[seat].lie); },
   // 그 소파에 나 말고 아무도 없을 때만 누울 수 있어요
@@ -4479,6 +4496,18 @@ const World = {
       if (pz < ins.z1 + 0.4) { const roofY = ins.wall + (ins.ridge - ins.wall) * (1 - Math.abs(px) / (ins.hx + 0.5)) - 0.6; py = Math.min(py, roofY); }
     }
     py = Math.max(py, 0.3); // 땅 밑으로는 안 내려가요
+    // 🎥 마당에서 카메라를 돌릴 때 건물·나무·물건 속으로 들어가지 않게: 나 → 카메라 사이에 막는 게 있으면 그 앞까지 당겨요
+    if (this.roomName === "yard" && !c.inside) {
+      const cl = this.camColliders(r), tg = this.cam.target, want = Math.hypot(px - tg.x, py - tg.y, pz - tg.z);
+      if (cl.length && want > 0.5) {
+        const dir = this._camDir || (this._camDir = new T.Vector3()); dir.set(px - tg.x, py - tg.y, pz - tg.z).normalize();
+        const rc = this._camRay || (this._camRay = new T.Raycaster()); rc.set(tg, dir); rc.near = 0.2; rc.far = want;
+        const hit = rc.intersectObjects(cl, false).find((h) => h.object.visible && (!h.object.parent || h.object.parent.visible));
+        let d = hit ? Math.max(0.7, hit.distance - 0.35) : want;
+        this._camD = this._camD == null ? d : d < this._camD ? d : this._camD + (d - this._camD) * Math.min(1, dt * 3); // 막히면 바로, 풀리면 천천히
+        if (this._camD < want - 0.01) { px = tg.x + dir.x * this._camD; py = Math.max(0.3, tg.y + dir.y * this._camD); pz = tg.z + dir.z * this._camD; }
+      } else this._camD = null;
+    }
     cam.position.set(px, py, pz); cam.lookAt(this.cam.target);
     // 카메라 쪽 벽 숨기기 / 천장
     if (r.wallHide) for (const w of r.wallHide) w.g.visible = (w.nx * px + w.nz * pz) > w.d - 0.01;
