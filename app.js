@@ -6,7 +6,7 @@ const VERSES = window.VERSES || [];
 const BOOKS = window.BOOKS || [];
 const W = window.World;
 // 🔖 world.js가 같이 올라갔는지 확인 (깃허브에 app.js만 올라가고 world.js가 옛날 것이면 지도·뒷마당이 안 바뀌어요)
-const WORLD_VER = "2026-11-20a";
+const WORLD_VER = "2026-11-21a";
 if (!W || W.ver !== WORLD_VER) setTimeout(() => { const b = document.createElement("div"); b.className = "ver-warn"; b.textContent = `⚠️ 사이트 파일이 덜 올라갔어요: world.js가 옛날 버전이에요 (지금 ${W && W.ver ? W.ver : "옛날 것"} · 필요한 것 ${WORLD_VER}). 깃허브에 world.js를 다시 올려 주세요.`; document.body.append(b); }, 1500);
 const LIMIT = { bubble: 80, status: 60, wall: 200, name: 12 };
 // 코드 안의 방 이름: yard = 마당, worship = 본당(기도하는 공간), cafe = 성경 읽는 공간, vision = 비전, room301 = 301호, praise = 찬양팀 연습실(리빙리버)
@@ -1720,6 +1720,7 @@ function renderCatFood() {
     boss ? h("p", { class: "cat-boss", text: "👑 고양이 대장! 산책할 고양이를 원하는 만큼 골라요" }) : null,
     h("div", { class: "board-label", text: `🐾 같이 산책할 고양이 ${boss ? "(여러 마리 가능)" : "(한 마리 · 샤샤는 껌딱지와 함께)"}` }),
     h("div", { class: "cat-cards" }, ...cards),
+    catGoBtn(),
     CW && Date.now() < CW.until ? h("p", { class: "muted tiny", text: `지금 ${CW.cats.map((k) => W.CATS[k].name).join(", ")}와 산책 중 · ${Math.max(1, Math.ceil((CW.until - Date.now()) / 60000))}분 남았어요` }) : null,
     h("div", { class: "board-label", text: "🥣 기본 밥 (모두 +1 · 하루 3번까지 쳐요)" }),
     h("div", { class: "shelf-list" }, ...Object.entries(CAT_FOOD).map(([k, [em, nm]]) => feedBtn(k, em, nm, 0, false))),
@@ -1730,6 +1731,25 @@ function renderCatFood() {
     h("div", { class: "board-label", style: "margin-top:12px", text: "🐾 최근에 밥 준 사람" }),
     h("ul", { class: "recent-list" }, ...(catFeeds.length ? catFeeds.slice(0, 6).map((f) => { const fd = CAT_FOOD[f.kind] || (TREATS[f.kind] ? [TREATS[f.kind].e, TREATS[f.kind].name] : null); return h("li", {}, h("span", { class: "t", text: `${f.name || "익명"} · ${fd ? fd.join(" ") : f.kind}` }), h("small", { text: timeAgo(f.created_at) })); })
       : [h("li", { class: "none", text: "아직 기록이 없어요." })]))].filter(Boolean));
+}
+// 🐾 2026-11-21: 고양이를 고른 뒤 누르는 확인 버튼 (예전엔 밥을 줘야만 시작돼서 '골랐는데 안 따라와요'가 생겼어요)
+//   오늘 이미 밥을 줬으면 바로 따라오고, 아직이면 건사료를 주고 다 먹으면(70초) 따라와요
+function catGoBtn() {
+  const picks = [...catPick], walking = CW && Date.now() < CW.until;
+  if (!picks.length) return h("p", { class: "cat-go-hint", text: "👆 같이 산책할 고양이를 먼저 골라요" });
+  const names = picks.map((k) => W.CATS[k].name).join(", "), fed = !!(MS.log[nyDay()] || {}).catfeed;
+  const same = walking && picks.length === CW.cats.length && picks.every((k) => CW.cats.includes(k));
+  if (same) return h("p", { class: "cat-go-hint", text: `🐾 ${names}와 산책 중이에요` });
+  return h("button", { class: "btn primary wide cat-go", text: walking ? `🐾 ${names}로 바꿔서 산책하기` : fed ? `🐾 ${names}와 산책 시작!` : `🥣 밥 주고 ${names}와 산책 시작!`, onclick: () => catWalkGo(picks, fed || walking) });
+}
+function catWalkGo(picks, now) {
+  if (!now) { feedCats(Object.keys(CAT_FOOD)[0]); return; } // 밥을 주면 feedCats가 고른 고양이로 산책을 잡아요
+  const busy = catsBusy(), boss = catBoss(), ok = picks.filter((k) => !busy[k] && (CAT_RULE[k].with != null ? catOpen(0) || boss : catOpen(k))).slice(0, boss ? 5 : 2);
+  if (!ok.length) return toast("지금은 그 고양이와 산책할 수 없어요");
+  const keep = CW && Date.now() < CW.until ? CW.until : Date.now() + CAT_WALK_MIN * 60000;
+  CW = { cats: ok, start: Date.now(), until: keep }; store.set("catWalk", CW);
+  closeModal("catModal"); refreshMe();
+  toast(`🐾 ${ok.map((k) => W.CATS[k].name).join(", ")}가 따라와요! (${Math.max(1, Math.round((keep - Date.now()) / 60000))}분)`); CW.shown = true;
 }
 function openCatFood() { if (S.room !== "yard") return; catPick = new Set(CW && Date.now() < CW.until ? CW.cats : []); renderCatFood(); openModal("catModal"); loadCatFeeds(); }
 async function feedCats(kind) {
@@ -3965,7 +3985,7 @@ const MISSIONS = {
   // 🙏 신앙
   pray: { e: "🙏", t: "본당에서 기도하기", how: "본당에서 '🙏 기도하기'를 20초 넘게 하거나, 기도제목 말풍선을 올려요", go: () => goRoom("worship") },
   verse: { e: "📖", t: "오늘의 말씀 장 읽기", how: "오늘의 말씀이 있는 장을 1분 넘게 읽거나 '✓ 다 읽었어요'를 눌러요", go: () => { const v = todayVerse(); if (v) openReader(v.b - 1, v.c); } },
-  walk: { e: "🌿", t: "말씀 산책길 끝까지 걷기", how: "뒷마당 산책길 팻말 7개를 읽고 🏁 끝 팻말까지 가요", go: () => goYard(W.WALK.start.x, W.WALK.start.z + 1.2, "🌿 말씀 산책길") },
+  walk: { e: "🌿", t: "말씀 산책길 끝까지 걷기", how: "뒷마당 산책길에서 오늘 큐티 팻말을 차례로 읽고 🏁 끝 팻말까지 가요", go: () => goYard(W.WALK.start.x, W.WALK.start.z + 1.2, "🌿 말씀 산책길") },
   note: { e: "🔖", t: "말씀 노트에 구절 담기", how: "성경을 읽다가 구절을 누르거나, 오늘의 말씀·산책길에서 '🔖 담기'를 눌러요", go: () => { const v = todayVerse(); if (v) openReader(v.b - 1, v.c); } },
   plan: { e: "🗓", t: "읽기 계획 오늘 분량", how: "성경 읽는 공간의 🗓 읽기 계획에서 오늘 분량을 읽어요 (처음이면 계획을 골라 시작)", go: () => { goRoom("cafe"); setTimeout(() => (S.profile && S.profile.rplan ? openPlanView() : openPlanPick()), 600); } },
   rest: { e: "🕊", t: "5분 쉼 루틴", how: "비전 방에서 🕊 5분 쉼 루틴을 끝까지 해요 (숨 고르기 · 말씀 · 감사 · 기도)", go: () => { goRoom("vision"); setTimeout(() => openRest(), 600); } },
@@ -4457,6 +4477,7 @@ async function maybeWelcome() {
   pages.push(() => [h("div", { class: "wc-h", text: "🎯 오늘의 미션" }),
     h("ul", { class: "al-list" }, ...list.map((x) => h("li", { class: x.done ? "done" : "" }, h("span", { class: "mc-chk", text: x.done ? "✓" : x.e }), h("span", { class: "t" }, x.t, h("small", { text: x.how })), x.done ? h("b", { class: "ok", text: "완료" }) : h("button", { class: "btn ghost sm", text: "가기", onclick: () => { closeModal("welcomeModal"); x.go(); } })))),
     h("p", { class: "muted tiny", text: "3개를 다 하면 🎁 선물 상자가 열려요 (가끔 ✨ 성경 인물 착장!)" }),
+    wcExplore(),
     v ? h("div", { class: "wc-verse" }, h("p", { text: v.text }), h("small", { text: v.ref + " (개역한글)" })) : null]);
   let notes = [];
   try { notes = (await api.listNotices(null)).slice(0, 3); } catch (e) {}
@@ -4476,6 +4497,13 @@ async function maybeWelcome() {
     : [h("div", { class: "wc-h" }, "🧀 Cheese Mellow Bites", h("span", { class: "ad-tag", text: "광고" })), h("img", { class: "show-poster", src: "cheese-mellow-poster.jpg", alt: "치즈멜로바이트" }), h("p", { class: "muted", text: `쫀득한 치즈 쿠키 · 200g $${CM_PRICE.s} · 450g $${CM_PRICE.l} · 수익금은 청년부 음료수 회비 🥤` }),
       h("div", { class: "modal-actions" }, h("button", { class: "btn primary", text: "🛒 주문하기", onclick: () => { closeModal("welcomeModal"); openOrder(); } }), h("button", { class: "btn ghost", text: "🚪 쇼룸 가기", onclick: () => { closeModal("welcomeModal"); goShowroom(false); } }))]);
   WC = { pages, i: 0 }; renderWelcome(); openModal("welcomeModal");
+}
+function wcExplore() { // 🗺 오늘의 그루터기 첫 장에 오늘의 탐험 코스
+  const d = nyDay(), course = exCourse(d), n = course.filter((c) => exStamped(c.id, d)).length;
+  return h("div", { class: "wc-ex" },
+    h("div", { class: "wc-ex-h" }, h("b", { text: `🗺 오늘의 탐험 코스 ${n}/5` }), h("button", { class: "btn primary sm", text: "도장판 열기", onclick: () => { closeModal("welcomeModal"); openExplore(); } })),
+    h("div", { class: "wc-ex-row" }, ...course.map((c) => h("span", { class: "chip" + (exStamped(c.id, d) ? " got" : ""), text: `${exStamped(c.id, d) ? "✅" : c.e} ${c.t}` }))),
+    h("small", { class: "muted", text: `5곳을 돌면 🎒 탐험 상자 · 🎁 보물 힌트: ${exGem(d).hint}` }));
 }
 function renderWelcome() {
   const p = WC.pages[WC.i]; if (!p) return;
@@ -5500,7 +5528,8 @@ function liarNew(cat) {
 }
 function openParty(tab) { if (tab) PG.tab = tab; openModal("partyModal"); renderParty(); }
 $$("[data-ptab]").forEach((b) => (b.onclick = () => { PG.tab = b.dataset.ptab; renderParty(); }));
-$$("[data-party-open]").forEach((b) => (b.onclick = () => openParty()));
+// 2026-11-21: 301호 파티 게임(밸런스·라이어)은 사용자 요청으로 뺐어요 (버튼 없음, 코드는 남겨 둠)
+$$("[data-party-open]").forEach((b) => { const sec = b.closest(".read-sec"); if (sec) sec.remove(); else b.remove(); });
 setInterval(() => { if (!$("#partyModal").hidden) { const k = JSON.stringify(partyPeers().map((p) => [p.id, p.bal, p.balPick, p.liar && p.liar.t, p.liar && p.liar.rev, p.lvote])); if (k !== PG.key) { PG.key = k; renderParty(); } } }, 700);
 
 /* ================= 🕊 비전 (30~40대 싱글): 🕊 5분 쉼 루틴 · 🌱 4주 습관 챌린지 ================= */
@@ -6301,8 +6330,28 @@ function renderZoneChip() {
   const me = S.room === "yard" && W.actorPos(myId), z = me && W.zoneOf(me.x, me.z), txt = S.room === "yard" ? (z ? "📍 " + z.name.replace(/^\S+\s/, "") : "") : "📍 " + (ROOM_NAME[S.room] || "");
   if (el.textContent !== txt) { el.textContent = txt; el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); }
   el.hidden = !started || !txt;
+  renderExChip();
 }
 setInterval(renderZoneChip, 700);
+// 🗺 2026-11-21: 탐험 도장판이 잘 안 보여서 — 화면 왼쪽 아래에 늘 보이는 '오늘의 탐험' 버튼
+function renderExChip() {
+  let el = $("#exChip"); if (!el) { el = h("button", { id: "exChip", class: "ex-chip", onclick: openExplore }); $("#viewport").append(el); }
+  if (!started) { el.hidden = true; return; }
+  const d = nyDay(), n = exCourse(d).filter((c) => exStamped(c.id, d)).length, day = exDay(d);
+  const txt = day.exdone ? (exBoxGot(d) ? `🗺 탐험 완주 ✓${day.exgem ? "" : " · 🎁 보물 찾기"}` : "🎒 탐험 상자 열기!") : `🗺 오늘의 탐험 ${n}/5`;
+  if (el.textContent !== txt) el.textContent = txt;
+  el.classList.toggle("hot", !!day.exdone && !exBoxGot(d));
+  el.classList.toggle("under-bars", $("#zoneChip") ? $("#zoneChip").classList.contains("under-bars") : false);
+  el.classList.toggle("solo", !$("#zoneChip") || $("#zoneChip").hidden);
+  el.hidden = false;
+  exBeacons();
+}
+// 3D: 아직 안 찍은 오늘 코스 장소 위에 ⭐ 표시 (마당에서만)
+function exBeacons() {
+  if (!W.setBeacons) return;
+  const d = nyDay(), list = S.room === "yard" ? exCourse(d).filter((c) => !c.room && !exStamped(c.id, d)).map((c) => ({ x: c.poi.x, z: c.poi.z, t: c.t })) : [];
+  const key = JSON.stringify(list); if (EXT.bkey === key) return; EXT.bkey = key; W.setBeacons(list);
+}
 function mapGo(poi) {
   closeModal("mapModal");
   if (S.room === "yard" && poi.k !== "sled") { const z = W.zoneOf(poi.x, poi.z), go0 = () => mapGo2(poi); askWarp(poi, z ? z.id : "front", `${poi.e} ${poi.t}`, go0); return; }

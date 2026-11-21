@@ -1162,3 +1162,15 @@ body.typing .composer { padding-top: 6px; padding-bottom: 6px; }
 .map-svg .poi.ex-done .ex-ring { stroke: #4f9a5a; stroke-dasharray: none; }
 .map-svg .ex-newt { font-size: 1.3px; font-weight: 700; fill: #d9483b; }
 .map-svg .ex-pplt { font-size: 1.5px; font-weight: 700; fill: #2f4f8a; }
+/* 🗺 2026-11-21: 늘 보이는 '오늘의 탐험' 버튼 + 오늘의 그루터기 탐험 칸 */
+.ex-chip { position: absolute; left: 12px; bottom: 46px; z-index: 8; border: 2px solid #fff4dc; background: #f2b632; color: #3a2e22; font: inherit; font-size: 13px; font-weight: 700; padding: 6px 14px; border-radius: 999px; box-shadow: 0 3px 10px rgba(0,0,0,.22); cursor: pointer; }
+.ex-chip.solo { bottom: 12px; }
+.ex-chip.hot { background: #d9483b; color: #fff; animation: exPulse 1.2s ease-in-out infinite; }
+@keyframes exPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.07); } }
+.ex-chip.under-bars, body.typing .ex-chip { display: none; }
+.wc-ex { background: #fff6d6; border: 2px solid #f2d98a; border-radius: 14px; padding: 8px 10px; margin: 8px 0; display: grid; gap: 6px; }
+.wc-ex-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; } .wc-ex-h b { color: #7a5a2a; }
+.wc-ex-row { display: flex; flex-wrap: wrap; gap: 4px; } .wc-ex-row .chip { font-size: 12px; } .wc-ex-row .chip.got { background: #eef7e8; border-color: #6b8a63; }
+/* 🐾 고양이 산책 확인 버튼 */
+.cat-go { margin: 8px 0 4px; font-size: 15px; }
+.cat-go-hint { margin: 8px 0 4px; text-align: center; font-weight: 700; color: #8a6a44; background: #fff6d6; border-radius: 10px; padding: 7px; }
