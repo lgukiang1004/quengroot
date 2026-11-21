@@ -1162,15 +1162,40 @@ function makeCat(c) {
   return { group: g, head, legs, tail, body };
 }
 // 고양이 자세 (걷기 · 앉기 · 먹기 · 쓰다듬기) — 길고양이와 따라다니는 고양이가 같이 써요
-function catPose(c, walking, eating, t, petting, i) {
-  const sw = walking ? Math.sin(t * 9 + i) * 0.5 : 0;
-  c.legs[0].rotation.x = sw; c.legs[3].rotation.x = sw; c.legs[1].rotation.x = -sw; c.legs[2].rotation.x = -sw;
-  const sit = !walking && !eating;
-  if (sit) { c.legs[2].rotation.x = 1.1; c.legs[3].rotation.x = 1.1; }
-  c.body.rotation.x = sit ? -0.3 : eating ? 0.12 : 0; c.body.position.y = sit ? 0.21 : 0.24 + Math.abs(sw) * 0.02;
-  c.head.rotation.x = eating ? 0.75 + Math.sin(t * 8 + i) * 0.12 : petting ? -0.45 : sit ? -0.1 + Math.sin(t * 0.5 + i) * 0.08 : 0.05;
-  c.head.rotation.z = petting ? Math.sin(t * 6) * 0.15 : 0;
-  c.tail.rotation.z = Math.sin(t * (petting ? 6 : 2) + i) * 0.45;
+function catPose(c, walking, eating, t, petting, i, lie) {
+  // 처음 모양(서 있는 자세)을 기억해 두고(c.pd), 자세가 바뀔 때만 몸 자리를 옮겨요
+  const g = c.group, ch = g.children[1];
+  if (!c.pd) c.pd = { body: c.body.position.clone(), head: c.head.position.clone(), ch: ch.position.clone(), tail: c.tail.position.clone(), legs: c.legs.map((l) => l.position.clone()), extra: g.children.filter((m) => m !== c.body && m !== ch && m !== c.head && m !== c.tail && !c.legs.includes(m)).map((m) => [m, m.position.clone(), m.rotation.x]) };
+  const D = c.pd, sw = walking ? Math.sin(t * 9 + i) * 0.5 : 0, mode = walking ? "walk" : eating ? "eat" : lie ? "lie" : "sit";
+  if (mode !== c.mode) {
+    c.mode = mode;
+    c.body.position.copy(D.body); c.head.position.copy(D.head); ch.position.copy(D.ch); c.tail.position.copy(D.tail); c.tail.rotation.x = 0; c.body.rotation.x = 0;
+    c.legs.forEach((l, k) => { l.position.copy(D.legs[k]); l.rotation.x = 0; l.rotation.z = 0; });
+    for (const [m, pos, rx] of D.extra) { m.position.copy(pos); m.rotation.x = rx; }
+    if (mode === "sit") { // 🐈 2026-11-21: 진짜 앉은 자세 — 엉덩이는 땅에, 가슴은 위로, 앞발은 곧게, 뒷발은 몸 밑에 접고, 꼬리는 바닥에
+      c.body.position.set(0, 0.2, -0.07); c.body.rotation.x = -0.6;
+      ch.position.set(0, 0.3, 0.1); c.head.position.set(0, 0.5, 0.12);
+      c.legs[0].position.set(-0.06, 0.18, 0.1); c.legs[1].position.set(0.06, 0.18, 0.1);
+      c.legs[2].position.set(-0.1, 0.07, -0.1); c.legs[3].position.set(0.1, 0.07, -0.1); c.legs[2].rotation.x = c.legs[3].rotation.x = -1.45;
+      c.tail.position.set(0, 0.05, -0.2); c.tail.rotation.x = -1.35;
+      for (const [m, pos, rx] of D.extra) { m.position.set(pos.x, pos.y + 0.06, pos.z - 0.06); m.rotation.x = rx - 0.55; }
+    } else if (mode === "lie") { // 😺 식빵 자세로 엎드려 쉬기 — 배는 바닥에, 앞발은 앞으로 쭉, 뒷발은 접고, 꼬리는 옆으로 둘러요
+      c.body.position.set(0, 0.11, 0); ch.position.set(0, 0.1, 0.16); c.head.position.set(0, 0.22, 0.26);
+      c.legs[0].position.set(-0.07, 0.05, 0.12); c.legs[1].position.set(0.07, 0.05, 0.12); c.legs[0].rotation.x = c.legs[1].rotation.x = -1.5;
+      c.legs[2].position.set(-0.11, 0.05, -0.14); c.legs[3].position.set(0.11, 0.05, -0.14); c.legs[2].rotation.x = c.legs[3].rotation.x = -1.5;
+      c.tail.position.set(0.04, 0.05, -0.22); c.tail.rotation.x = -1.45;
+      for (const [m, pos, rx] of D.extra) m.position.set(pos.x, pos.y - 0.13, pos.z);
+    }
+  }
+  if (mode === "walk" || mode === "eat") {
+    c.legs[0].rotation.x = sw; c.legs[3].rotation.x = sw; c.legs[1].rotation.x = -sw; c.legs[2].rotation.x = -sw;
+    c.body.rotation.x = eating ? 0.12 : 0; c.body.position.y = D.body.y + Math.abs(sw) * 0.02;
+  }
+  if (mode === "lie") { c.body.scale.y = (c.bodySY || (c.bodySY = c.body.scale.y)) * (1 + Math.sin(t * 1.6 + i) * 0.03); } // 숨 쉬기
+  else if (c.bodySY) c.body.scale.y = c.bodySY;
+  c.head.rotation.x = eating ? 0.75 + Math.sin(t * 8 + i) * 0.12 : petting ? -0.45 : mode === "sit" ? -0.05 + Math.sin(t * 0.5 + i) * 0.08 : mode === "lie" ? 0.15 + Math.sin(t * 0.3 + i) * 0.06 : 0.05;
+  c.head.rotation.z = petting ? Math.sin(t * 6) * 0.15 : mode === "lie" ? Math.sin(t * 0.2 + i) * 0.2 : 0;
+  c.tail.rotation.z = Math.sin(t * (petting ? 6 : mode === "walk" ? 2 : 0.8) + i) * (mode === "walk" || petting ? 0.45 : 0.25);
 }
 // 밥 준 기록 판: { today, last: { name, kind, ago } }
 const FEED_NAME = { dry: "🥣 건사료", wet: "🥫 캔사료", churu: "🍬 츄르", water: "💧 물" };
@@ -2406,6 +2431,9 @@ function buildYard() {
 
 
   /* ----- 길고양이 5마리 ----- */
+  // 😺 엎드려 쉬는 자리 (h: 높이) — 캣타워 꼭대기·아래 집 지붕·벤치 3개·풀밭 여기저기 (14곳, 5마리가 서로 다른 곳)
+  const CAT_LOUNGE = [{ x: -22.1, z: -9.9, h: 2.25 }, { x: -22.1, z: -9.55, h: 1.14, ry: 0 }, { x: -8.95, z: 6.6, h: 0.49, ry: Math.PI / 2 }, { x: 1.25, z: 6.6, h: 0.49, ry: -Math.PI / 2 }, { x: 13.2, z: 4.62, h: 0.49, ry: 0 },
+    { x: -14, z: 3, h: 0 }, { x: -12.5, z: 7.5, h: 0 }, { x: -5, z: 6, h: 0 }, { x: 7.8, z: 7, h: 0 }, { x: 15.5, z: 5, h: 0 }, { x: -17.5, z: 7, h: 0 }, { x: 11, z: 3, h: 0 }, { x: -17.6, z: -2.8, h: 0 }, { x: -19.7, z: -8.9, h: 0.12, ry: Math.PI }];
   const catPts = [[-19, -6.2], [-23.5, -6.8], [-24.5, -11], [-18, -13.5], [-17.6, -2.8], [-24, -3.5], [-22, -14.5],
     [-17.5, 7], [-14, 3], [-12.5, 7.5], [-9, 3.5], [-8, 9.5], [-5, 6], [-15, 9.5], [-10.5, 5.5],
     [-0.5, 3], [1, 10.5], [0, 1.5], [7.5, 10.8], [8, 3], [1.5, 4.5], [7.8, 7], [-1, 11.5],
@@ -2441,8 +2469,12 @@ function buildYard() {
       // 누가 밥을 주면: 밥그릇 앞으로 뛰어와서 먹고, 끝나면 원래 자리로 돌아가요
       if (!c.cur) c.cur = { x, z };
       let tx = x, tz = z;
+      // 😺 2026-11-21: 가끔(5분마다 40%쯤) 2분 30초 동안 벤치·풀밭·캣타워 위에 올라가 엎드려 쉬어요 (시각으로 정해서 모두 같은 화면)
+      const slot = Math.floor(now / 300), lz = now - slot * 300 < 150 && hash32(c.i + 71, slot) % 5 < 2 ? CAT_LOUNGE[(hash32(77, slot) + c.i * 3) % CAT_LOUNGE.length] : null;
+      if (!feeding && lz) { tx = lz.x; tz = lz.z; }
+      let lying = false;
       if (feeding) { tx = FEED_SPOTS[c.i][0]; tz = FEED_SPOTS[c.i][1]; }
-      if (feeding || c.away) {
+      if (feeding || c.away || lz) {
         let gx = tx, gz = tz;
         const crossing = (c.cur.x > -15.8) !== (gx > -15.8) && Math.min(c.cur.z, gz) < -3.4; // 건물 모서리를 돌아가요
         if (crossing) { gx = -16.4; gz = -3.1; }
@@ -2450,14 +2482,16 @@ function buildYard() {
         if (dd > 0.06) { const step = Math.min(dd, dt * 1.7); c.cur.x += dx / dd * step; c.cur.z += dz / dd * step; walking = true; yaw = Math.atan2(dx, dz); c.away = true; }
         else if (!crossing) {
           if (feeding) { walking = false; eating = true; yaw = Math.PI; }
+          else if (lz) { walking = false; lying = true; c.away = true; yaw = lz.ry != null ? lz.ry : (c.i * 1.3) % 6.28; }
           else { c.away = false; }
         }
         x = c.cur.x; z = c.cur.z;
       } else { c.cur.x = x; c.cur.z = z; }
       c.yaw = yaw;
       const petting = pnow < c.petUntil;
-      c.group.position.set(x, 0, z); c.group.rotation.y = c.yaw + (walking || eating ? 0 : Math.sin(c.i * 2.1) * 0.6);
-      catPose(c, walking, eating, t, petting, c.i);
+      const wantY = lying && lz ? lz.h : 0; c.y = c.y == null ? wantY : c.y + (wantY - c.y) * Math.min(1, dt * (wantY > c.y ? 5 : 8)); // 폴짝 올라가고 내려와요
+      c.group.position.set(x, c.y, z); c.group.rotation.y = c.yaw + (walking || eating || lying ? 0 : Math.sin(c.i * 2.1) * 0.6);
+      catPose(c, walking, eating, t, petting, c.i, lying && c.y > wantY - 0.05);
       c.pos = { x, z };
     }
   };
@@ -3550,7 +3584,7 @@ function buildPraise() {
 // 누운 자세 회전: 몸(위쪽) → 소파 길이 방향, 얼굴(앞쪽) → 하늘
 const LIE_Q = new T.Quaternion().setFromRotationMatrix(new T.Matrix4().makeBasis(new T.Vector3(0, 0, 1), new T.Vector3(1, 0, 0), new T.Vector3(0, 1, 0)));
 const World = {
-  ver: "2026-11-21d", // 🔖 app.js의 WORLD_VER와 같아야 해요 (다르면 화면 위에 '파일이 덜 올라갔어요' 안내)
+  ver: "2026-11-21f", // 🔖 app.js의 WORLD_VER와 같아야 해요 (다르면 화면 위에 '파일이 덜 올라갔어요' 안내)
   LOOK, safeLook, makeCharacter, poseCharacter,
   renderer: null, camera: null, rooms: {}, room: null, roomName: null,
   actors: new Map(), hooks: null, el: null, overlay: null,
@@ -4665,7 +4699,7 @@ const World = {
   catLabelFrame(cam, v) {
     for (const l of this.catLabels || []) {
       const c = l.c; if (!c.pos || !c.group.visible) { l.el.style.display = "none"; continue; }
-      const P = new T.Vector3(c.pos.x, 0.82, c.pos.z), d = cam.position.distanceTo(P); v.copy(P).project(cam);
+      const P = new T.Vector3(c.pos.x, 0.82 + (c.y || 0), c.pos.z), d = cam.position.distanceTo(P); v.copy(P).project(cam);
       const vis = d < 16 && v.z < 1 && Math.abs(v.x) < 1.05 && Math.abs(v.y) < 1.05;
       l.el.style.display = vis ? "" : "none";
       if (vis) l.el.style.transform = `translate(${((v.x * 0.5 + 0.5) * this.w).toFixed(1)}px, ${((-v.y * 0.5 + 0.5) * this.h).toFixed(1)}px) translate(-50%, -100%)`;
