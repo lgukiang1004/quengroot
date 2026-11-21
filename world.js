@@ -45,10 +45,11 @@ function safeLook(p) {
     pets: Array.isArray(p.pets) ? [...new Set(p.pets.filter((k) => Number.isInteger(k) && k >= 0 && k < 5))].slice(0, 5) : Number.isInteger(p.pet) && p.pet >= 0 && p.pet < 5 ? [p.pet] : [], // 🐾 산책 중인 고양이들 (2026-11-18)
     catBoss: !!p.catBoss, // 👑 고양이 대장 (까맹이도 딴 데 안 가요)
     costume: typeof p.costume === "string" && COSTUMES[p.costume] ? p.costume : "", // 🎁 오늘의 선물 (24시간)
+    costume2: typeof p.costume2 === "string" && COSTUMES[p.costume2] && p.costume2 !== p.costume ? p.costume2 : "", // 🎒 2026-11-21: 탐험 상자 꾸미기까지 두 개 같이 입어요
   };
 }
 // 모양이 바뀌면 캐릭터를 다시 만들어요 (trail·pet은 몸에 붙는 게 아니라서 빼요)
-const lookKeyOf = (l) => [l.hair, l.hairColor, l.glasses, l.color, l.gender, l.item, l.wear, l.halo, l.shoulder, l.apron, l.pin, l.costume].join("|");
+const lookKeyOf = (l) => [l.hair, l.hairColor, l.glasses, l.color, l.gender, l.item, l.wear, l.halo, l.shoulder, l.apron, l.pin, l.costume, l.costume2].join("|");
 
 /* ---------------- 재료 / 텍스처 ---------------- */
 const matCache = new Map();
@@ -182,7 +183,7 @@ function makeCharacter(lookIn) {
 
   // 머리카락
   // 모자(산타 모자·털모자)를 쓰면 모자 안에 들어갈 윗머리는 만들지 않아요 → 머리카락이 모자를 뚫고 나오지 않게
-  const hat = look.wear === "santa" || look.wear === "beanie" || look.wear === "wheathat" || (COSTUMES[look.costume] && COSTUMES[look.costume].hat);
+  const hat = look.wear === "santa" || look.wear === "beanie" || look.wear === "wheathat" || (COSTUMES[look.costume] && COSTUMES[look.costume].hat) || (COSTUMES[look.costume2] && COSTUMES[look.costume2].hat);
   const HAT_TS = Math.PI * 0.36; // 이 각도(위에서부터)보다 위쪽 머리는 모자 속
   const sph = (r, ps, pl, ts, tl) => {
     if (hat && ts < HAT_TS) { const end = ts + tl; ts = HAT_TS; tl = end - HAT_TS; if (tl <= 0.01) return new T.Group(); }
@@ -255,13 +256,16 @@ function makeCharacter(lookIn) {
     skirt.position.y = 0.3; skirt.castShadow = true; g.add(skirt);
     for (const sx of [-1, 1]) { const lash = new T.Mesh(new T.BoxGeometry(0.035, 0.008, 0.01), dark); lash.position.set(0.13 * sx, 0.03, 0.283); lash.rotation.z = sx * 0.5; eyesOpen.add(lash); }
   }
-  const C = COSTUMES[look.costume];
-  if (!(C && C.hat)) addWear(head, g, look.wear, look.color);
+  let C = COSTUMES[look.costume], C2 = COSTUMES[look.costume2];
+  if (!C && C2) { C = C2; C2 = null; }
+  if (C2 && C2.rare && C.rare) C2 = null; // 성경 인물 겉옷 두 벌은 겹쳐서 하나만
+  if (!(C && C.hat) && !(C2 && C2.hat)) addWear(head, g, look.wear, look.color);
   // 🎁 오늘의 선물이 손에 드는 것이면 그날은 원래 들던 것 대신 그걸 들어요
   const inHandC = (obj) => { obj.position.add(new T.Vector3(0, -0.33, 0.04)); armR.add(obj); };
   const inHandL = (obj) => { obj.position.add(new T.Vector3(0, -0.33, 0.04)); armL.add(obj); }; // 왼손 (두 손에 하나씩 들 때)
   const hold = C && C.hand ? C.make({ head, g, armL, armR, inHand: inHandC, inHandL, look }) : addItem(g, armL, armR, look.item);
   if (C && !C.hand) C.make({ head, g, armL, armR, inHand: inHandC, inHandL, look });
+  if (C2) { if (!C2.hand) C2.make({ head, g, armL, armR, inHand: inHandC, inHandL, look }); else if (!(C && C.hand)) C2.make({ head, g, armL, armR, inHand: inHandC, inHandL, look }); else C2.make({ head, g, armL, armR, inHand: inHandL, inHandL, look }); } // 둘 다 손에 드는 거면 두 번째는 왼손
   const sp = addSpecial(head, g, look);
   return { group: g, legL, legR, armL, armR, head, body, eyesOpen, eyesClosed, hold, halo: sp.halo, haloStar: sp.star, dove: sp.dove };
 }
@@ -3546,7 +3550,7 @@ function buildPraise() {
 // 누운 자세 회전: 몸(위쪽) → 소파 길이 방향, 얼굴(앞쪽) → 하늘
 const LIE_Q = new T.Quaternion().setFromRotationMatrix(new T.Matrix4().makeBasis(new T.Vector3(0, 0, 1), new T.Vector3(1, 0, 0), new T.Vector3(0, 1, 0)));
 const World = {
-  ver: "2026-11-21a", // 🔖 app.js의 WORLD_VER와 같아야 해요 (다르면 화면 위에 '파일이 덜 올라갔어요' 안내)
+  ver: "2026-11-21b", // 🔖 app.js의 WORLD_VER와 같아야 해요 (다르면 화면 위에 '파일이 덜 올라갔어요' 안내)
   LOOK, safeLook, makeCharacter, poseCharacter,
   renderer: null, camera: null, rooms: {}, room: null, roomName: null,
   actors: new Map(), hooks: null, el: null, overlay: null,
@@ -3663,7 +3667,7 @@ const World = {
     a.pets = new Map(); a.pet = null; a.petKey = "";
   },
   syncPet(a, look) {
-    const want = look.costume === "daniel" ? [99] : [];
+    const want = look.costume === "daniel" || look.costume2 === "daniel" ? [99] : [];
     if (this.roomName === "yard") for (const k of look.pets || []) if (CATS[k]) want.push(k);
     const key = want.join(",");
     if (a.petKey === key && a.pets) return;

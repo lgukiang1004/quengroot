@@ -6,7 +6,7 @@ const VERSES = window.VERSES || [];
 const BOOKS = window.BOOKS || [];
 const W = window.World;
 // 🔖 world.js가 같이 올라갔는지 확인 (깃허브에 app.js만 올라가고 world.js가 옛날 것이면 지도·뒷마당이 안 바뀌어요)
-const WORLD_VER = "2026-11-21a";
+const WORLD_VER = "2026-11-21b";
 if (!W || W.ver !== WORLD_VER) setTimeout(() => { const b = document.createElement("div"); b.className = "ver-warn"; b.textContent = `⚠️ 사이트 파일이 덜 올라갔어요: world.js가 옛날 버전이에요 (지금 ${W && W.ver ? W.ver : "옛날 것"} · 필요한 것 ${WORLD_VER}). 깃허브에 world.js를 다시 올려 주세요.`; document.body.append(b); }, 1500);
 const LIMIT = { bubble: 80, status: 60, wall: 200, name: 12 };
 // 코드 안의 방 이름: yard = 마당, worship = 본당(기도하는 공간), cafe = 성경 읽는 공간, vision = 비전, room301 = 301호, praise = 찬양팀 연습실(리빙리버)
@@ -3338,7 +3338,7 @@ function renderPickers() {
   swatch("#hairColorPick", L.hairColors.map((x) => x[0]), "hairColor");
   chips("#glassesPick", L.glasses, "glasses");
   swatch("#colorPick", L.shirts, "color");
-  if (preview) preview.set({ ...draft, costume: giftActive() || "" });
+  if (preview) preview.set({ ...draft, costume: giftActives()[0] || "", costume2: giftActives()[1] || "" });
 }
 function renderMeChip() {
   const p = S.profile || {};
@@ -4159,7 +4159,7 @@ function mySkins() {
   const out = { halo: ok("halo", p.halo) ? p.halo : "none", trail: ok("trail", p.trail) ? p.trail : "none", shoulder: ok("shoulder", p.shoulder) ? p.shoulder : "none",
     apron: ok("apron", p.apron) ? p.apron : "none", pin: ok("pin", p.pin) ? p.pin : "none",
     ...catWalkLook(), // 🐾 산책 중인 고양이 (pet · pets · petAt · catBoss)
-    item: lockedLook("item", p.item) ? "none" : p.item, wear: lockedLook("wear", p.wear) ? "none" : p.wear, badge: "", book: "", title: "", costume: giftActive() || "" };
+    item: lockedLook("item", p.item) ? "none" : p.item, wear: lockedLook("wear", p.wear) ? "none" : p.wear, badge: "", book: "", title: "", costume: giftActives()[0] || "", costume2: giftActives()[1] || "" };
   if (p.title && skinFor("title", p.title) && skinOpen(skinFor("title", p.title), c)) out.title = p.title;
   if (p.badge && skinFor("badge", p.badge) && skinOpen(skinFor("badge", p.badge), c)) { const ys = c.won[p.badge] || []; out.badge = BADGE_TXT[p.badge](ys[ys.length - 1]); }
   if (out.item === "scroll" && c.books.length) out.book = "📜 " + c.books[0].name;
@@ -4233,6 +4233,13 @@ function giftActive() {
   }
   return null;
 }
+// 2026-11-21: 오늘의 선물 + 🎒 탐험 상자 꾸미기가 같이 나오면 둘 다 입어요 (최근 받은 것 두 개까지)
+function giftActives() {
+  const now = Date.now(), off = store.get("giftOff", {}), out = [];
+  for (const [key, at] of Object.entries(MS.giftAt || {}).sort((a, b) => b[1] - a[1])) { const id = key.split("|")[1]; if (now - at < 24 * 3600e3 && now >= at && COST()[id] && !off[key] && !out.includes(id)) out.push(id); }
+  return out.slice(0, 2);
+}
+function giftKeysActive() { const now = Date.now(); return Object.entries(MS.giftAt || {}).filter(([k, at]) => now - at < 24 * 3600e3 && now >= at && COST()[k.split("|")[1]]).sort((x, y) => y[1] - x[1]).map(([k]) => k).slice(0, 2); }
 function giftKeyActive() { const now = Date.now(); for (const [key, at] of Object.entries(MS.giftAt || {})) if (now - at < 24 * 3600e3) return key; return null; }
 function giftLeftText(key) { const ms = 24 * 3600e3 - (Date.now() - (MS.giftAt[key] || 0)); const hh = Math.max(0, Math.floor(ms / 3600e3)), mm = Math.max(0, Math.floor((ms % 3600e3) / 60e3)); return `${hh}시간 ${mm}분 남았어요`; }
 function giftCard(id, opts = {}) {
@@ -4268,7 +4275,7 @@ function giftWearBtn(key) {
 function giftStatusEl() {
   const d = nyDay(), day = MS.log[d] || {}, key = giftKeyActive();
   if (day.stamp && !giftOf(d)) return h("button", { class: "btn primary wide gift-open", text: "🎁 오늘의 선물 상자 열기", onclick: openGift });
-  if (key) return h("div", { class: "gift-now" }, h("span", { text: "🎁 지금 입고 있는 선물: " }), h("b", { text: COST()[key.split("|")[1]]?.name || "" }), h("small", { text: " · " + giftLeftText(key) }));
+  if (key) { const ks = giftKeysActive(); return h("div", { class: "gift-now" }, h("span", { text: "🎁 지금 입고 있는 선물: " }), ...ks.map((k, i) => h("span", {}, i ? " + " : "", h("b", { text: COST()[k.split("|")[1]]?.name || "" }), h("small", { text: " · " + giftLeftText(k) })))); }
   return null;
 }
 function stampNextEl(c) {
@@ -4282,7 +4289,7 @@ function albumGift(c) {
   const have = giftCollected(), rare = Object.entries(COST()).filter(([, x]) => x.rare), common = Object.entries(COST()).filter(([, x]) => !x.rare);
   const key = giftKeyActive();
   const out = [giftStatusEl() || h("p", { class: "muted tiny", text: "오늘의 미션 3개를 다 하면 선물 상자가 열려요. 받은 선물은 24시간 동안 입어요." })];
-  if (key) out.push(giftCard(key.split("|")[1], { left: giftLeftText(key) }), giftWearBtn(key));
+  if (key) for (const k of giftKeysActive()) out.push(giftCard(k.split("|")[1], { left: giftLeftText(k) }), giftWearBtn(k));
   out.push(h("div", { class: "board-label", text: `📖 성경 인물 도감 ${rare.filter(([id]) => have.has(id)).length}/${rare.length}` }),
     h("div", { class: "dex" }, ...rare.map(([id, x]) => { const got = have.has(id);
       return h("button", { class: "dex-item" + (got ? " got" : ""), title: got ? `${x.name} · ${x.ref[2]}` : "아직 못 만났어요", onclick: () => { if (got) { closeModal("albumModal"); openReader(x.ref[0] - 1, x.ref[1]); } else toast(`❔ 아직 못 만난 인물이에요. 힌트: ${x.ref[2]}${x.month ? " (12월에만 나와요)" : ""}`); } },
