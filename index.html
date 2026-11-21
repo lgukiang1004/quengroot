@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <!-- 홈 화면 앱 (아이폰·삼성폰) -->
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#fffdf8">
@@ -459,6 +459,7 @@
   <div class="modal-card wide-card map-card">
     <div class="drawer-head"><h2>🗺 마당 지도</h2><button class="icon-btn" data-close="mapModal">✕</button></div>
     <p class="muted tiny">가고 싶은 곳을 누르면 그곳으로 걸어가요. 문을 누르면 그 방으로 들어가요.</p>
+    <div class="map-zoom"><button class="icon-btn" id="mapZin" title="크게">＋</button><button class="icon-btn" id="mapZout" title="작게">－</button><button class="icon-btn" id="mapZreset" title="처음으로">⟲</button><span class="muted tiny">두 손가락·휠로 확대, 끌어서 옮겨요</span></div>
     <div class="map-wrap" id="mapWrap"></div>
   </div>
 </div>

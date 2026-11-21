@@ -22,8 +22,8 @@ const LOOK = {
   // ✨ 특별 스킨 (전부 미션으로 받아요)
   halos: [["none", "없음"], ["sprout1", "🌱 새싹 하나"], ["sprout2", "🌱🌱 새싹 둘"], ["bud", "🌷 꽃봉오리 새싹"], ["star", "⭐ 베들레헴 별"], ["rainbow", "🌈 언약의 무지개"]],
   shoulders: [["none", "없음"], ["dove", "🕊 비둘기"]],
-  aprons: [["none", "없음"], ["cheese", "🧀 치즈 앞치마"]],
-  pins: [["none", "없음"], ["lily", "🤍 백합 배지"]],
+  aprons: [["none", "없음"], ["cheese", "🧀 치즈 앞치마"], ["backpack", "🎒 탐험 배낭"]],
+  pins: [["none", "없음"], ["lily", "🤍 백합 배지"], ["compass", "🧭 나침반 목걸이"]],
   trails: [["none", "없음"], ["sprout", "🌱 새싹 발자국"]],
 };
 const pick = (v, list, d) => (list.includes(v) ? v : d);
@@ -403,6 +403,21 @@ function addSpecial(head, g, look) {
     }
     const strap = new T.Mesh(new T.TorusGeometry(0.15, 0.012, 4, 16, Math.PI), M("#e8a91f", 0.6)); strap.position.set(0, 0.84, 0.03); strap.rotation.x = -0.25; g.add(strap);
     const tie = new T.Mesh(new T.TorusGeometry(0.2, 0.01, 4, 20), M("#e8a91f", 0.6)); tie.rotation.x = Math.PI / 2; tie.position.y = 0.6; tie.scale.set(1.08, 1.12, 1); g.add(tie);
+  }
+  if (look.apron === "backpack") { // 🎒 탐험 배낭 (등 뒤) — 탐험 도장판 7일 연속
+    const bp = new T.Group(); bp.position.set(0, 0.6, -0.25); g.add(bp);
+    box(bp, 0.3, 0.36, 0.14, M("#c0703a", 0.8), 0, 0, 0);
+    box(bp, 0.26, 0.12, 0.04, M("#a85a2a", 0.8), 0, -0.06, -0.08, { cast: false }); // 앞주머니
+    box(bp, 0.32, 0.08, 0.16, M("#8a4a24", 0.8), 0, 0.17, 0, { cast: false }); // 뚜껑
+    const roll = cyl(bp, 0.05, 0.05, 0.34, M("#4f7a4a", 0.8), 0, 0.24, -0.02, 10); roll.rotation.z = Math.PI / 2; // 돗자리 말아 둔 것
+    for (const sx of [-0.1, 0.1]) box(bp, 0.035, 0.34, 0.03, M("#6b3a1c", 0.8), sx, 0.02, 0.09, { cast: false }); // 멜빵
+  }
+  if (look.pin === "compass") { // 🧭 나침반 목걸이 — 탐험 도장판 30일 연속
+    const nk = new T.Mesh(new T.TorusGeometry(0.13, 0.006, 4, 20, Math.PI), M("#c9a24a", 0.4, { metalness: 0.5 })); nk.position.set(0, 0.8, 0.12); nk.rotation.set(-0.35, 0, Math.PI); g.add(nk);
+    const cp = new T.Group(); cp.position.set(0, 0.64, 0.225); g.add(cp);
+    const rim = cyl(cp, 0.045, 0.045, 0.02, M("#c9a24a", 0.35, { metalness: 0.6 }), 0, 0, 0, 16); rim.rotation.x = Math.PI / 2;
+    const face = new T.Mesh(new T.CircleGeometry(0.036, 16), M("#fff8e4", 0.5)); face.position.z = 0.011; cp.add(face);
+    const nd = new T.Mesh(new T.ConeGeometry(0.008, 0.05, 4), M("#d9483b", 0.5)); nd.position.set(0, 0.012, 0.014); cp.add(nd);
   }
   if (look.pin === "lily") {
     const pin = new T.Group(); pin.position.set(-0.1, 0.68, 0.215); g.add(pin);
@@ -1385,24 +1400,47 @@ const WALK = (() => {
   const st = at(0), en = at(1);
   return { n, curve, L, at, signs, start: { x: st.x, z: st.z }, end: { x: en.x, z: en.z } };
 })();
-function walkSignTex(v, i, done) {
+function walkSignTex(v, i, done, n) {
+  n = n || WALK.n;
   return canvasTex(512, 360, (g, w, h) => {
     g.fillStyle = done ? "#fff6d6" : "#f6efe0"; g.fillRect(0, 0, w, h);
     g.strokeStyle = done ? "#e0a92a" : "#8a6a44"; g.lineWidth = 16; g.strokeRect(8, 8, w - 16, h - 16);
     g.textAlign = "center";
-    if (done && v) { // 지나간 팻말: 말씀이 보여요
-      g.fillStyle = "#6b8a63"; g.font = "700 30px 'Gowun Dodum', 'Apple SD Gothic Neo', sans-serif"; g.fillText(`🌿 ${i + 1} / ${WALK.n} ✓`, w / 2, 52);
-      g.fillStyle = "#3a2e22"; g.font = "30px 'Gowun Batang', 'Apple SD Gothic Neo', serif";
+    if (i >= n) { // 오늘 본문이 짧아서 쓰지 않는 팻말: 쉼표
+      g.fillStyle = "#6b8a63"; g.font = "700 64px 'Gowun Dodum', 'Apple SD Gothic Neo', sans-serif"; g.fillText("🌿 쉼표", w / 2, 160);
+      g.fillStyle = "#8a6a44"; g.font = "700 30px 'Gowun Dodum', sans-serif"; g.fillText("잠깐 숨 고르고 🏁 끝 팻말로 가요", w / 2, 240);
+    } else if (done && v) { // 지나간 팻말: 말씀이 보여요
+      g.fillStyle = "#6b8a63"; g.font = "700 30px 'Gowun Dodum', 'Apple SD Gothic Neo', sans-serif"; g.fillText(`🌿 ${i + 1} / ${n} ✓`, w / 2, 52);
+      const long = v.text.length > 90; g.fillStyle = "#3a2e22"; g.font = (long ? "25px" : "30px") + " 'Gowun Batang', 'Apple SD Gothic Neo', serif";
       const lines = []; let cur = "";
       for (const ch of v.text) { if (g.measureText(cur + ch).width > w - 70) { lines.push(cur); cur = ch; } else cur += ch; }
       if (cur) lines.push(cur);
-      const shown = lines.slice(0, 6); if (lines.length > 6) shown[5] = shown[5].slice(0, -1) + "…";
-      shown.forEach((l, k) => g.fillText(l, w / 2, 104 + k * 40));
+      const mx = long ? 7 : 6, lh = long ? 33 : 40, shown = lines.slice(0, mx); if (lines.length > mx) shown[mx - 1] = shown[mx - 1].slice(0, -1) + "…";
+      shown.forEach((l, k) => g.fillText(l, w / 2, 100 + k * lh));
       g.fillStyle = "#8a6a44"; g.font = "700 26px 'Gowun Dodum', sans-serif"; g.fillText(v.ref, w / 2, h - 30);
     } else { // 아직: 번호만 크게 (앞에 서면 말씀이 펼쳐져요)
       g.fillStyle = "#6b8a63"; g.font = "700 120px 'Gowun Dodum', 'Apple SD Gothic Neo', sans-serif"; g.fillText(String(i + 1), w / 2, 190);
       g.fillStyle = "#8a6a44"; g.font = "700 30px 'Gowun Dodum', sans-serif"; g.fillText("🌿 앞에 서면 말씀이 펼쳐져요", w / 2, 280);
     }
+  });
+}
+// 🗺 탐험 팻말 (산책길 시작 아치 옆): 오늘 누가 걸어 둔 말씀 + 🏅 100일 탐험가 명판
+function exploreBoardTex(info) {
+  return canvasTex(512, 420, (g, w, h) => {
+    g.fillStyle = "#f6efe0"; g.fillRect(0, 0, w, h); g.strokeStyle = "#8a6a44"; g.lineWidth = 14; g.strokeRect(7, 7, w - 14, h - 14);
+    g.textAlign = "center"; const I = info || {};
+    g.fillStyle = "#6b8a63"; g.font = "700 30px 'Gowun Dodum', 'Apple SD Gothic Neo', sans-serif"; g.fillText("📜 오늘의 말씀 팻말", w / 2, 50);
+    if (I.verse && I.verse.text) {
+      g.fillStyle = "#3a2e22"; g.font = "26px 'Gowun Batang', serif"; const lines = []; let cur = "";
+      for (const ch of I.verse.text) { if (g.measureText(cur + ch).width > w - 60) { lines.push(cur); cur = ch; } else cur += ch; } if (cur) lines.push(cur);
+      lines.slice(0, 4).forEach((l, k) => g.fillText(k === 3 && lines.length > 4 ? l.slice(0, -1) + "…" : l, w / 2, 92 + k * 34));
+      g.fillStyle = "#8a6a44"; g.font = "700 22px 'Gowun Dodum', sans-serif"; g.fillText(`— ${I.verse.name || "익명"}님이 걸어 둔 말씀`, w / 2, 236);
+    } else { g.fillStyle = "#8a6a44"; g.font = "24px 'Gowun Dodum', sans-serif"; g.fillText("🗺 탐험 장터에서 내 말씀을 하루 걸 수 있어요", w / 2, 140); }
+    g.fillStyle = "#c9a24a"; g.fillRect(40, 262, w - 80, 3);
+    g.fillStyle = "#7a5a2a"; g.font = "700 26px 'Gowun Dodum', sans-serif"; g.fillText("🏅 100일 그루터기 탐험가", w / 2, 300);
+    const names = (I.hall || []).slice(0, 12); g.font = "24px 'Gowun Dodum', sans-serif"; g.fillStyle = "#3a2e22";
+    if (!names.length) g.fillText("첫 번째 주인공을 기다려요", w / 2, 340);
+    else { const rows = [names.slice(0, 4), names.slice(4, 8), names.slice(8, 12)].filter((r) => r.length); rows.forEach((r, k) => g.fillText(r.join(" · "), w / 2, 338 + k * 30)); }
   });
 }
 // 🎶 청음회 안내판 (제목 · 주최 · 시간 · 지금 곡 · 다음 곡)
@@ -1413,13 +1451,14 @@ function listenBoardTex(info) {
     g.strokeStyle = "#f2d98a"; g.lineWidth = 10; g.strokeRect(10, 10, w - 20, h - 20);
     g.textAlign = "center"; g.fillStyle = "#f2d98a"; g.font = "700 34px 'Gowun Dodum', 'Apple SD Gothic Neo', sans-serif"; g.fillText("🎶 한밤의 청음회", w / 2, 70);
     const I = info || {};
-    if (!I.title) { g.fillStyle = "#fff8e4"; g.font = "36px 'Gowun Dodum', sans-serif"; g.fillText(I.loading ? "불러오는 중…" : "아직 예정된 청음회가 없어요", w / 2, 250); g.fillStyle = "#cfc8ee"; g.font = "28px 'Gowun Dodum', sans-serif"; g.fillText("눌러서 예약해요 · 찬양 30분을 함께 들어요", w / 2, 310); return; }
+    if (!I.title) { g.fillStyle = "#fff8e4"; g.font = "36px 'Gowun Dodum', sans-serif"; g.fillText(I.loading ? "불러오는 중…" : "아직 예정된 청음회가 없어요", w / 2, 250); g.fillStyle = "#cfc8ee"; g.font = "28px 'Gowun Dodum', sans-serif"; g.fillText("눌러서 예약해요 · 찬양 30분을 함께 들어요", w / 2, 310); if (I.cheer) { g.fillStyle = "#ffd98a"; g.font = "700 26px 'Gowun Dodum', sans-serif"; let c = "💬 " + I.cheer; while (c.length > 1 && g.measureText(c).width > w - 70) c = c.slice(0, -1); g.fillText(c, w / 2, h - 40); } return; }
     g.fillStyle = "#ffffff"; g.font = "700 54px 'Gowun Dodum', sans-serif"; let t = I.title; while (t.length > 1 && g.measureText(t).width > w - 80) t = t.slice(0, -1); g.fillText(t, w / 2, 160);
     g.fillStyle = "#cfc8ee"; g.font = "30px 'Gowun Dodum', sans-serif"; g.fillText(`주최 ${I.host || "익명"} · ${I.when || ""}`, w / 2, 212);
     if (I.now) { g.fillStyle = "#f2d98a"; g.font = "700 32px 'Gowun Dodum', sans-serif"; g.fillText("▶ 지금", w / 2, 290); g.fillStyle = "#fff"; g.font = "36px 'Gowun Dodum', sans-serif"; let n = I.now; while (n.length > 1 && g.measureText(n).width > w - 80) n = n.slice(0, -1); g.fillText(n, w / 2, 340); }
     else { g.fillStyle = "#fff8e4"; g.font = "34px 'Gowun Dodum', sans-serif"; g.fillText(I.state || "", w / 2, 320); }
     if (I.next) { g.fillStyle = "#cfc8ee"; g.font = "28px 'Gowun Dodum', sans-serif"; let n = "다음 · " + I.next; while (n.length > 1 && g.measureText(n).width > w - 80) n = n.slice(0, -1); g.fillText(n, w / 2, 400); }
-    g.fillStyle = "#9a93c8"; g.font = "24px 'Gowun Dodum', sans-serif"; g.fillText("돗자리에 앉아서 함께 들어요 · 눌러서 자세히", w / 2, h - 34);
+    if (I.cheer) { g.fillStyle = "#ffd98a"; g.font = "700 26px 'Gowun Dodum', sans-serif"; let c = "💬 " + I.cheer; while (c.length > 1 && g.measureText(c).width > w - 70) c = c.slice(0, -1); g.fillText(c, w / 2, h - 34); }
+    else { g.fillStyle = "#9a93c8"; g.font = "24px 'Gowun Dodum', sans-serif"; g.fillText("돗자리에 앉아서 함께 들어요 · 눌러서 자세히", w / 2, h - 34); }
   });
 }
 function buildBackyard(s, seats, obs, clickables, labels) {
@@ -1444,6 +1483,14 @@ function buildBackyard(s, seats, obs, clickables, labels) {
   cyl(guide, 0.05, 0.05, 1.2, log, 0, 0.6, 0, 6); box(guide, 1.0, 0.7, 0.05, M("#f6efe0", 0.8), 0, 1.4, 0.02);
   const gp = new T.Mesh(new T.PlaneGeometry(0.95, 0.65), new T.MeshBasicMaterial({ map: textTex([["📜 사용 설명", 40, 50], ["눌러 보세요", 30, 100]], { w: 300, h: 150, bg: "#f6efe0", fg: "#4f7a4a" }) })); gp.position.set(0, 1.4, 0.05); guide.add(gp);
   obs.push([S0.x + 2.0, S0.z + 0.4, S0.x + 2.4, S0.z + 0.8]);
+  // 🗺 탐험 팻말 (아치 왼쪽): 오늘의 말씀 팻말 + 100일 탐험가 명판
+  const exG = new T.Group(); exG.position.set(S0.x - 2.4, 0, S0.z + 0.7); exG.rotation.y = 0.45; g.add(exG);
+  for (const sx of [-0.55, 0.55]) cyl(exG, 0.05, 0.05, 1.9, log, sx, 0.95, -0.03, 6);
+  box(exG, 1.3, 1.08, 0.05, M("#8a6a44", 0.7), 0, 1.45, -0.03);
+  const exMat = new T.MeshBasicMaterial({ map: exploreBoardTex({}) });
+  const exP = new T.Mesh(new T.PlaneGeometry(1.22, 1.0), exMat); exP.position.set(0, 1.45, 0.0); exG.add(exP);
+  exG.traverse((m) => (m.userData.action = "explore")); clickables.push(exG);
+  obs.push([S0.x - 3.0, S0.z + 0.4, S0.x - 1.8, S0.z + 1.0]);
   arch.traverse((m) => (m.userData.action = "walk")); guide.traverse((m) => (m.userData.action = "walkhelp")); clickables.push(arch, guide);
   labels.push({ x: S0.x, y: 3.3, z: S0.z, html: "🌿 말씀 산책길 · 여기서 시작", action: "walk" });
   // 팻말 7개 (앞에 서야 말씀이 펼쳐져요)
@@ -1530,11 +1577,13 @@ function buildBackyard(s, seats, obs, clickables, labels) {
   bdG.traverse((m) => (m.userData.action = "listen")); clickables.push(bdG);
   obs.push([Lc.x - 3.1, Lc.z + 4.2, Lc.x + 3.1, Lc.z + 5.0]);
   labels.push({ x: Lc.x, y: 4.0, z: Lc.z + 4.6, html: "🎶 한밤의 청음회 · 눌러서 예약·듣기", action: "listen" });
+  const matMeshes = [];
   const matCols = [["#d9483b", "#fff4dc"], ["#3a8fd9", "#ffffff"], ["#f2c84b", "#fff6e0"], ["#4f9a5a", "#f3f8ee"], ["#8e44ad", "#f6eefc"], ["#e8862f", "#fff1e0"]];
   const mats = [[-3.2, -1.6], [0, -1.9], [3.2, -1.6], [-3.4, 1.1], [0, 0.9], [3.4, 1.1]];
   mats.forEach(([dx, dz], mi) => {
     const x = Lc.x + dx, z = Lc.z + dz, [c1, c2] = matCols[mi];
     const mt = new T.Mesh(new T.PlaneGeometry(2.2, 1.6), new T.MeshStandardMaterial({ map: stripeTex(c1, c2), roughness: 0.9 })); mt.rotation.x = -Math.PI / 2; mt.position.set(x, 0.03, z); mt.receiveShadow = true; g.add(mt);
+    matMeshes.push({ mt, c1, c2 });
     const rot = Math.atan2(Lc.x - x, (Lc.z + 4.6) - z), ids = [];
     for (const k of [-0.5, 0.5]) { const sid = `LS${mi}-${ids.length}`, c = Math.cos(rot), sn = Math.sin(rot), sx = x + k * c, sz = z - k * sn; seats[sid] = { x: sx, z: sz, rot, h: 0.36, ax: sx - Math.sin(rot) * 0.9, az: sz - Math.cos(rot) * 0.9, listen: true, mat: true }; ids.push(sid); }
     mt.userData.seats = ids; clickables.push(mt);
@@ -1613,7 +1662,15 @@ function buildBackyard(s, seats, obs, clickables, labels) {
     for (let k = ripples.length - 1; k >= 0; k--) { const R = ripples[k], e = (now - R.t0) / 1000, life = R.big ? 2.2 : 1.4; if (e > life) { g.remove(R.m); R.m.geometry.dispose(); R.m.material.dispose(); ripples.splice(k, 1); continue; } const sc = 1 + e * (R.big ? 7 : 5); R.m.scale.set(sc, sc, 1); R.m.material.opacity = 0.7 * (1 - e / life); }
   };
   const upd0 = update;
-  return { signs, update: (dt, t) => { upd0(dt, t); skipFrame(dt); }, verses: null, done: -1, listenMat, skip, tw: lTw };
+  // 🎁 숨은 보물 (탐험 도장판): 가까이 가야 반짝이며 보여요
+  const gem = new T.Group(); gem.visible = false; g.add(gem);
+  box(gem, 0.34, 0.26, 0.34, M("#d9483b", 0.6), 0, 0.13, 0); box(gem, 0.36, 0.06, 0.36, M("#f2c84b", 0.4), 0, 0.28, 0);
+  box(gem, 0.06, 0.27, 0.35, M("#f2c84b", 0.4), 0, 0.135, 0, { cast: false });
+  const gemGlow = new T.Mesh(new T.SphereGeometry(0.42, 14, 10), new T.MeshBasicMaterial({ color: "#fff1a8", transparent: true, opacity: 0.22, depthWrite: false })); gemGlow.position.y = 0.2; gem.add(gemGlow);
+  gem.traverse((m) => (m.userData.action = "treasure")); clickables.push(gem);
+  const upd1 = (dt, t) => { if (gem.visible) { gem.rotation.y += dt * 1.2; gem.position.y = 0.05 + Math.abs(Math.sin(t * 2.2)) * 0.12; gemGlow.material.opacity = 0.16 + Math.sin(t * 4) * 0.08; } };
+  const setMat = (hex) => { for (const M0 of matMeshes) { const old = M0.mt.material.map; M0.mt.material.map = hex ? stripeTex(hex, "#fff6e8") : stripeTex(M0.c1, M0.c2); M0.mt.material.needsUpdate = true; old && old.dispose(); } };
+  return { signs, update: (dt, t) => { upd0(dt, t); skipFrame(dt); upd1(dt, t); }, verses: null, done: -1, listenMat, skip, tw: lTw, exMat, gem, setMat };
 }
 
 /* ---------------- 게시판 그림 (모임 시간표 · 운동장 랭킹) ---------------- */
@@ -1779,15 +1836,19 @@ function makeRoadCars(s) {
     const car = makeCar(c, (li + i) % 3 === 2 ? "van" : "car");
     car.g.rotation.y = L.dir > 0 ? 0 : Math.PI; car.g.userData.noCam = true; // 지나가는 차는 카메라가 피하지 않아요
     s.add(car.g);
-    list.push({ ...car, lane: L, off: L.gaps[i] * ROAD_END * 2 });
+    list.push({ ...car, lane: L, off: L.gaps[i] * ROAD_END * 2, i });
   }));
-  updateRoadCars(list, 0);
+  updateRoadCars(list, 0, true);
   return list;
 }
-function updateRoadCars(list, dt) {
-  const now = Date.now() / 1000, span = ROAD_END * 2;
+// 2026-11-20: 🌙 밤이 되면(해 지면) 길마다 차 한 대만 다녀요. 차가 길 끝(화면 밖)에 있을 때만 사라지거나 나타나서 갑자기 '뿅' 하지 않아요.
+function updateRoadCars(list, dt, first) {
+  const now = Date.now() / 1000, span = ROAD_END * 2, night = (World.nightK || 0) > 0.5;
   for (const c of list) {
     const d = ((now * c.lane.speed + c.off) % span + span) % span; // 0 ~ span
+    const want = !night || c.i === 0;
+    if (c.g.visible !== want && (first || d < 3 || d > span - 3)) c.g.visible = want;
+    if (!c.g.visible) continue;
     c.g.position.set(c.lane.dir > 0 ? -ROAD_END + d : ROAD_END - d, 0, c.lane.z);
     const spin = (now * c.lane.speed) / 0.34; // 바퀴가 길에 맞춰 굴러가요
     for (const w of c.wheels) w.rotation.z = -spin;
@@ -3485,7 +3546,7 @@ function buildPraise() {
 // 누운 자세 회전: 몸(위쪽) → 소파 길이 방향, 얼굴(앞쪽) → 하늘
 const LIE_Q = new T.Quaternion().setFromRotationMatrix(new T.Matrix4().makeBasis(new T.Vector3(0, 0, 1), new T.Vector3(1, 0, 0), new T.Vector3(0, 1, 0)));
 const World = {
-  ver: "2026-11-19a", // 🔖 app.js의 WORLD_VER와 같아야 해요 (다르면 화면 위에 '파일이 덜 올라갔어요' 안내)
+  ver: "2026-11-20a", // 🔖 app.js의 WORLD_VER와 같아야 해요 (다르면 화면 위에 '파일이 덜 올라갔어요' 안내)
   LOOK, safeLook, makeCharacter, poseCharacter,
   renderer: null, camera: null, rooms: {}, room: null, roomName: null,
   actors: new Map(), hooks: null, el: null, overlay: null,
@@ -3534,6 +3595,7 @@ const World = {
       if (name === "yard" && this.rinkTop) { this.rooms[name] = b; this.setRinkBoard(this.rinkTop); }
       if (name === "yard" && this.walkVerses) { this.rooms[name] = b; this.setWalk(); }
       if (name === "yard" && this.listenInfo) { this.rooms[name] = b; this.setListenBoard(this.listenInfo); }
+      if (name === "yard") { this.rooms[name] = b; if (this.exInfo) this.setExploreBoard(this.exInfo); if (this.matHex) this.setMatColor(this.matHex); if (this.gemAt) this.setTreasure(this.gemAt.x, this.gemAt.z, this.gemAt.show); }
       if (name === "vision" && this.habitRows) { this.rooms[name] = b; this.setHabitBoard(this.habitRows); }
       if (name === "praise" && this.recList.length) { this.rooms[name] = b; this.setRecBoard(this.recList); }
       this.applySeasons(b); if (b.night) this.applyNight(b);
@@ -3771,8 +3833,13 @@ const World = {
     const r = this.rooms.yard; if (!r || !r.backyard) return;
     const B = r.backyard, vs = this.walkVerses || [], dn = this.walkDone || 0, key = JSON.stringify([vs.map((v) => v.ref), dn]);
     if (B.key === key) return; B.key = key;
-    for (const sg of B.signs) { const done = sg.i < dn, old = sg.mat.map; sg.mat.map = walkSignTex(vs[sg.i], sg.i, done); sg.mat.needsUpdate = true; old && old.dispose(); sg.on = done; sg.glow.material.emissiveIntensity = done ? 1 : 0; sg.frame.color.set(done ? "#e0a92a" : "#8a6a44"); }
+    const nn = vs.length || WALK.n;
+    for (const sg of B.signs) { const done = sg.i < dn, old = sg.mat.map; sg.mat.map = walkSignTex(vs[sg.i], sg.i, done, nn); sg.mat.needsUpdate = true; old && old.dispose(); sg.on = done; sg.glow.material.emissiveIntensity = done ? 1 : 0; sg.frame.color.set(done ? "#e0a92a" : "#8a6a44"); }
   },
+  // 🗺 탐험 (2026-11-20): 아치 옆 팻말 · 오늘의 돗자리 색 · 숨은 보물
+  setExploreBoard(info) { this.exInfo = info; const r = this.rooms.yard; if (!r || !r.backyard) return; const key = JSON.stringify(info); if (r.backyard.ekey === key) return; r.backyard.ekey = key; const m = r.backyard.exMat, old = m.map; m.map = exploreBoardTex(info); m.needsUpdate = true; old && old.dispose(); },
+  setMatColor(hex) { this.matHex = hex || null; const r = this.rooms.yard; if (!r || !r.backyard) return; if (r.backyard.mkey === (hex || "")) return; r.backyard.mkey = hex || ""; r.backyard.setMat(hex); },
+  setTreasure(x, z, show) { this.gemAt = { x, z, show }; const r = this.rooms.yard; if (!r || !r.backyard) return; const G = r.backyard.gem; G.visible = !!show && x != null; if (x != null) { G.position.x = x; G.position.z = z; } },
   setHabitBoard(rows) { this.habitRows = rows; const r = this.rooms.vision; if (!r || !r.habitMat) return; const key = JSON.stringify(rows); if (r.hkey === key) return; r.hkey = key; const old = r.habitMat.map; r.habitMat.map = habitBoardTex(rows); r.habitMat.needsUpdate = true; old && old.dispose(); },
   // 🪨 물수제비 던지기 (모두의 화면에서 같은 돌): 던진 사람 위치·방향·튈 횟수
   skipStone(id, x, z, ang, n) { const r = this.rooms.yard; if (!r || !r.backyard || this.roomName !== "yard") return 0; this.prank(id, "push"); return r.backyard.skip(x, z, ang, n); },
