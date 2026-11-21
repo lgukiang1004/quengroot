@@ -296,7 +296,7 @@ const COSTUMES = (() => {
   add("rainbowscarf", { name: "무지개 목도리", e: "🌈", make: ({ g }) => { ["#e74c3c", "#f39c12", "#f1c40f", "#2ecc71", "#3498db"].forEach((c, i) => { const r = new T.Mesh(new T.TorusGeometry(0.165, 0.028, 6, 20), M(c, 0.9)); r.rotation.x = Math.PI / 2; r.position.y = 0.74 + i * 0.026; g.add(r); }); const t = box(g, 0.1, 0.3, 0.04, M("#3498db", 0.9), 0.09, 0.62, 0.2); t.rotation.z = 0.12; } });
   add("balloon", { name: "풍선 들기", e: "🎈", hand: true, make: ({ inHand }) => { const b = new T.Group(); cyl(b, 0.003, 0.003, 0.9, M("#ffffff", 0.6), 0, 0.45, 0, 3); const bl = new T.Mesh(new T.SphereGeometry(0.16, 14, 12), M(["#e74c3c", "#3498db", "#f1c40f", "#e84393"][Math.floor(Math.random() * 4)], 0.25)); bl.scale.set(1, 1.18, 1); bl.position.y = 1.0; b.add(bl); inHand(b); return "one"; } });
   add("sparkle", { name: "반짝이 별 안경", e: "✨", make: ({ head }) => { const gm = M("#f2c84b", 0.25, { metalness: 0.7, emissive: "#b8860b", emissiveIntensity: 0.3 }); for (const sx of [-1, 1]) { const st = new T.Mesh(new T.ExtrudeGeometry(starShape(0.085, 0.04), { depth: 0.015, bevelEnabled: false }), gm); st.position.set(0.1 * sx, 0, 0.29); head.add(st); } box(head, 0.06, 0.014, 0.014, gm, 0, 0.01, 0.3); } });
-  add("earmuff", { name: "털 귀마개", e: "🎧", make: ({ head }) => { const fm = M("#f7d6e0", 0.95); for (const sx of [-1, 1]) { const e = new T.Mesh(new T.SphereGeometry(0.1, 12, 10), fm); e.position.set(0.31 * sx, 0.0, 0); head.add(e); } const band = new T.Mesh(new T.TorusGeometry(0.32, 0.018, 6, 24, Math.PI), M("#d98ca8", 0.6)); band.rotation.y = Math.PI / 2; head.add(band); } });
+  add("earmuff", { name: "털 귀마개", e: "🎧", make: ({ head, look }) => { const fm = M("#f7d6e0", 0.95), R0 = look && look.hair === "curly" ? 0.41 : look && /perm/.test(look.hair || "") ? 0.37 : 0.35; for (const sx of [-1, 1]) { const e = new T.Mesh(new T.SphereGeometry(0.11, 12, 10), fm); e.scale.set(0.7, 1, 1); e.position.set((R0 - 0.01) * sx, 0.0, -0.03); head.add(e); } const band = new T.Mesh(new T.TorusGeometry(R0, 0.02, 6, 24, Math.PI), M("#d98ca8", 0.6)); band.position.set(0, 0.0, -0.03); head.add(band); /* 머리 모양(뽀글 파마는 더 크게)에 맞춰 머리카락 밖으로 */ /* 2026-11-21: 머리띠가 얼굴 앞뒤로 지나가던 것 → 귀에서 귀로 머리 위를 넘어가게 */ } });
   add("ribbon", { name: "큰 리본 머리띠", e: "🎀", make: ({ head }) => { const rm = M("#e84393", 0.6); for (const sx of [-1, 1]) { const w = new T.Mesh(new T.ConeGeometry(0.09, 0.16, 4), rm); w.rotation.z = (Math.PI / 2) * sx; w.position.set(0.09 * sx, 0.33, 0.06); head.add(w); } const k = new T.Mesh(new T.SphereGeometry(0.04, 8, 6), rm); k.position.set(0, 0.33, 0.06); head.add(k); } });
 
   // ---- ✨ 희귀: 성경 인물 착장 ----
@@ -3550,7 +3550,7 @@ function buildPraise() {
 // 누운 자세 회전: 몸(위쪽) → 소파 길이 방향, 얼굴(앞쪽) → 하늘
 const LIE_Q = new T.Quaternion().setFromRotationMatrix(new T.Matrix4().makeBasis(new T.Vector3(0, 0, 1), new T.Vector3(1, 0, 0), new T.Vector3(0, 1, 0)));
 const World = {
-  ver: "2026-11-21b", // 🔖 app.js의 WORLD_VER와 같아야 해요 (다르면 화면 위에 '파일이 덜 올라갔어요' 안내)
+  ver: "2026-11-21d", // 🔖 app.js의 WORLD_VER와 같아야 해요 (다르면 화면 위에 '파일이 덜 올라갔어요' 안내)
   LOOK, safeLook, makeCharacter, poseCharacter,
   renderer: null, camera: null, rooms: {}, room: null, roomName: null,
   actors: new Map(), hooks: null, el: null, overlay: null,
@@ -3701,8 +3701,12 @@ const World = {
       }
       let dx = tx - P.x, dz = tz - P.z, d = Math.hypot(dx, dz), walking = false;
       if (d > 14) { P.x = tx; P.z = tz; d = 0; } // 너무 멀어지면 (썰매 등) 옆으로 쏙
-      if (d > 0.3) { const sp = Math.min(d, dt * Math.min(6.5, 1.2 + d * 2.2)); P.x += dx / d * sp; P.z += dz / d * sp; P.yaw = Math.atan2(dx, dz); walking = true; }
-      else { let dY = yaw - P.yaw; dY = Math.atan2(Math.sin(dY), Math.cos(dY)); P.yaw += dY * Math.min(1, dt * 3); }
+      // 2026-11-21: 내가 멈추면 고양이도 가까이 와서 앉아 있어요 (몸 방향만 살짝 바꾸는 건 따라 움직이지 않아요)
+      const still = !(a.path && a.path.length) && !a.kbWalking && !P.wander;
+      if (still && (P.rest || d < 0.3)) { P.rest = d < 1.6; if (P.rest) d = 0; } else P.rest = false;
+      if (P.rest) { const fy = Math.atan2(o.x - P.x, o.z - P.z); let dY = fy - P.yaw; dY = Math.atan2(Math.sin(dY), Math.cos(dY)); P.yaw += dY * Math.min(1, dt * 2); }
+      else if (d > 0.3) { const sp = Math.min(d, dt * Math.min(6.5, 1.2 + d * 2.2)); P.x += dx / d * sp; P.z += dz / d * sp; P.yaw = Math.atan2(dx, dz); walking = true; }
+      else if (!P.rest) { let dY = yaw - P.yaw; dY = Math.atan2(Math.sin(dY), Math.cos(dY)); P.yaw += dY * Math.min(1, dt * 3); }
       P.group.position.set(P.x, 0, P.z); P.group.rotation.y = P.yaw;
       catPose(P, walking, false, t, now < P.petUntil, P.k);
       P.pos = { x: P.x, z: P.z };
@@ -4596,13 +4600,17 @@ const World = {
         for (const h of rc.intersectObjects(cl, false)) {
           const o = h.object; if (!o.visible || (o.parent && !o.parent.visible)) continue;
           const bb = o.userData._camBox || (o.userData._camBox = new T.Box3().setFromObject(o).expandByScalar(0.25));
-          if (bb.containsPoint(cpt)) { d = Math.max(1.2, h.distance - 0.35); break; }
+          if (bb.containsPoint(cpt)) { d = Math.max(1.0, h.distance - 0.35); break; }
         }
         if (this._camD == null) this._camD = want;
         if (d < this._camD - 0.05) { this._camD += (d - this._camD) * Math.min(1, dt * 10); this._camFree = 0; }
         else { this._camFree = (this._camFree || 0) + dt; if (this._camFree > 0.6) this._camD += (Math.min(d, want) - this._camD) * Math.min(1, dt * 1.5); }
         this._camD = Math.min(this._camD, want);
-        if (this._camD < want - 0.01) { px = tg.x + dir.x * this._camD; py = Math.max(0.3, tg.y + dir.y * this._camD); pz = tg.z + dir.z * this._camD; }
+        if (this._camD < want - 0.01) {
+          // 2026-11-21: 너무 가까이 당기면 카메라가 내 머리 속으로 들어가요 → 1.8m보다는 안 가깝게, 대신 위로 올려서 내려다봐요
+          const dd = Math.max(1.8, this._camD), lift = Math.max(0, 1.8 - this._camD) * 1.1;
+          px = tg.x + dir.x * dd; py = Math.max(0.3, tg.y + dir.y * dd + lift); pz = tg.z + dir.z * dd;
+        }
       } else this._camD = null;
     }
     cam.position.set(px, py, pz); cam.lookAt(this.cam.target);

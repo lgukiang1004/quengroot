@@ -3,7 +3,7 @@
    - 성경 본문(bible/*.json)은 한 번 읽으면 폰에 저장 → 인터넷이 약해도 열려요
    - Supabase(실시간·글쓰기)는 저장하지 않고 항상 인터넷으로
    - 음원 파일(mp3 등)은 저장하지 않아요 (용량이 커서) */
-const VERSION = "qpc-2026-11-21c";
+const VERSION = "qpc-2026-11-21d";
 const SHELL = ["./", "index.html", "style.css", "app.js", "world.js", "jam-audio.js", "data.js", "verses.js", "quiz-bank.js", "config.js", "lib/three.min.js", "christmas-reason-cover.jpg", "cheese-mellow-poster.jpg", "ad-banner.jpg",
   "manifest.webmanifest", "icons/icon-192.png", "icons/logo-160.png", "icons/favicon-64.png"];
 
