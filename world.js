@@ -3546,7 +3546,7 @@ function buildPraise() {
 // 누운 자세 회전: 몸(위쪽) → 소파 길이 방향, 얼굴(앞쪽) → 하늘
 const LIE_Q = new T.Quaternion().setFromRotationMatrix(new T.Matrix4().makeBasis(new T.Vector3(0, 0, 1), new T.Vector3(1, 0, 0), new T.Vector3(0, 1, 0)));
 const World = {
-  ver: "2026-11-20a", // 🔖 app.js의 WORLD_VER와 같아야 해요 (다르면 화면 위에 '파일이 덜 올라갔어요' 안내)
+  ver: "2026-11-21a", // 🔖 app.js의 WORLD_VER와 같아야 해요 (다르면 화면 위에 '파일이 덜 올라갔어요' 안내)
   LOOK, safeLook, makeCharacter, poseCharacter,
   renderer: null, camera: null, rooms: {}, room: null, roomName: null,
   actors: new Map(), hooks: null, el: null, overlay: null,
@@ -3595,7 +3595,7 @@ const World = {
       if (name === "yard" && this.rinkTop) { this.rooms[name] = b; this.setRinkBoard(this.rinkTop); }
       if (name === "yard" && this.walkVerses) { this.rooms[name] = b; this.setWalk(); }
       if (name === "yard" && this.listenInfo) { this.rooms[name] = b; this.setListenBoard(this.listenInfo); }
-      if (name === "yard") { this.rooms[name] = b; if (this.exInfo) this.setExploreBoard(this.exInfo); if (this.matHex) this.setMatColor(this.matHex); if (this.gemAt) this.setTreasure(this.gemAt.x, this.gemAt.z, this.gemAt.show); }
+      if (name === "yard") { this.rooms[name] = b; if (this.beaconList) this.setBeacons(this.beaconList); if (this.exInfo) this.setExploreBoard(this.exInfo); if (this.matHex) this.setMatColor(this.matHex); if (this.gemAt) this.setTreasure(this.gemAt.x, this.gemAt.z, this.gemAt.show); }
       if (name === "vision" && this.habitRows) { this.rooms[name] = b; this.setHabitBoard(this.habitRows); }
       if (name === "praise" && this.recList.length) { this.rooms[name] = b; this.setRecBoard(this.recList); }
       this.applySeasons(b); if (b.night) this.applyNight(b);
@@ -3839,6 +3839,21 @@ const World = {
   // 🗺 탐험 (2026-11-20): 아치 옆 팻말 · 오늘의 돗자리 색 · 숨은 보물
   setExploreBoard(info) { this.exInfo = info; const r = this.rooms.yard; if (!r || !r.backyard) return; const key = JSON.stringify(info); if (r.backyard.ekey === key) return; r.backyard.ekey = key; const m = r.backyard.exMat, old = m.map; m.map = exploreBoardTex(info); m.needsUpdate = true; old && old.dispose(); },
   setMatColor(hex) { this.matHex = hex || null; const r = this.rooms.yard; if (!r || !r.backyard) return; if (r.backyard.mkey === (hex || "")) return; r.backyard.mkey = hex || ""; r.backyard.setMat(hex); },
+  // ⭐ 오늘 탐험 코스 표시: 장소 위에 떠서 통통 튀는 별 + 빛기둥 (마당)
+  setBeacons(list) {
+    this.beaconList = list || []; const r = this.rooms.yard; if (!r) return;
+    if (!r.beacons) r.beacons = [];
+    for (const b of r.beacons) { r.scene.remove(b.g); const ci = r.clickables.indexOf(b.g); if (ci >= 0) r.clickables.splice(ci, 1); b.g.traverse((m) => { if (m.material) { m.material.map && m.material.map.dispose(); m.material.dispose(); } if (m.geometry) m.geometry.dispose(); }); }
+    r.beacons = this.beaconList.map((p) => {
+      const g = new T.Group(); g.position.set(p.x, 0, p.z);
+      const beam = new T.Mesh(new T.CylinderGeometry(0.35, 0.6, 6, 16, 1, true), new T.MeshBasicMaterial({ color: "#ffe08a", transparent: true, opacity: 0.18, depthWrite: false, side: T.DoubleSide })); beam.position.y = 3; g.add(beam);
+      const tex = canvasTex(256, 128, (c, w, h) => { c.fillStyle = "rgba(242,182,50,.95)"; c.beginPath(); c.roundRect ? c.roundRect(6, 10, w - 12, h - 20, 40) : c.rect(6, 10, w - 12, h - 20); c.fill(); c.fillStyle = "#3a2e22"; c.font = "700 46px 'Gowun Dodum', 'Apple SD Gothic Neo', sans-serif"; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText("⭐ 탐험", w / 2, h / 2 + 2); });
+      const sp = new T.Sprite(new T.SpriteMaterial({ map: tex, transparent: true, depthTest: false })); sp.scale.set(1.6, 0.8, 1); sp.position.y = 4.4; sp.renderOrder = 5; g.add(sp);
+      g.userData.noCam = true; g.traverse((m) => (m.userData.action = "explore"));
+      r.scene.add(g); r.clickables.push(g); return { g, sp };
+    });
+    if (!r.beaconUpd) { r.beaconUpd = true; const up = r.update; r.update = (dt, t) => { up && up(dt, t); for (const b of r.beacons || []) b.sp.position.y = 4.3 + Math.abs(Math.sin(t * 2.4)) * 0.35; }; }
+  },
   setTreasure(x, z, show) { this.gemAt = { x, z, show }; const r = this.rooms.yard; if (!r || !r.backyard) return; const G = r.backyard.gem; G.visible = !!show && x != null; if (x != null) { G.position.x = x; G.position.z = z; } },
   setHabitBoard(rows) { this.habitRows = rows; const r = this.rooms.vision; if (!r || !r.habitMat) return; const key = JSON.stringify(rows); if (r.hkey === key) return; r.hkey = key; const old = r.habitMat.map; r.habitMat.map = habitBoardTex(rows); r.habitMat.needsUpdate = true; old && old.dispose(); },
   // 🪨 물수제비 던지기 (모두의 화면에서 같은 돌): 던진 사람 위치·방향·튈 횟수
