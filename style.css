@@ -75,7 +75,7 @@ input, select, textarea { font-family: inherit; font-size: 16px; color: var(--in
 .floater { position: fixed; z-index: 60; pointer-events: none; font-size: 24px; animation: floatUp 1.6s ease-out forwards; }
 .floater small { font-size: 11px; display: block; text-align: center; color: var(--ink); background: rgba(255,255,255,.88); border-radius: 6px; padding: 0 4px; white-space: nowrap; }
 
-.panel { position: absolute; left: 12px; top: 12px; width: min(380px, calc(100% - 24px)); background: rgba(255, 253, 248, .94); border-radius: 14px; box-shadow: var(--shadow); z-index: 10; overflow: hidden; backdrop-filter: blur(6px); }
+.panel { position: absolute; left: 12px; top: 12px; width: min(380px, calc(100% - 24px)); background: rgba(255, 253, 248, .97); border-radius: 14px; box-shadow: var(--shadow); z-index: 10; overflow: hidden; } /* 2026-11-20: 홈 화면 앱(특히 아이폰)에서 backdrop-filter 흐림 효과 때문에 위쪽 메뉴 글씨가 뿌옇게 보여서 뺐어요 */
 .panel-head { width: 100%; text-align: left; border: 0; background: transparent; padding: 10px 14px; font-size: 14px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
 .panel .chev { transition: transform .2s; }
 .panel.collapsed .chev { transform: rotate(-90deg); }
@@ -930,7 +930,7 @@ body.jamming #composer-praise { display: none; }
 .link-big b { font-size: 16px; }
 .link-big span { font-size: 13px; color: var(--muted); }
 /* 🧑 다른 기기에서 들어왔어요 */
-.away-screen { position: fixed; inset: 0; z-index: 200; background: rgba(30,40,34,.72); display: flex; align-items: center; justify-content: center; backdrop-filter: blur(3px); }
+.away-screen { position: fixed; inset: 0; z-index: 200; background: rgba(30,40,34,.72); display: flex; align-items: center; justify-content: center; }
 .away-card { background: #fffdf6; border-radius: 20px; padding: 26px 24px 20px; width: min(340px, calc(100vw - 32px)); text-align: center; box-shadow: 0 16px 40px rgba(0,0,0,.3); }
 .away-e { font-size: 44px; }
 .away-card b { display: block; font-size: 18px; margin: 6px 0; }
@@ -1102,3 +1102,63 @@ body.jamming #composer-praise { display: none; }
   .fun-pop { top: 108px; z-index: 16; }
 }
 
+
+/* 💬 폰에서 쓰는 중: 입력칸은 자판 바로 위, 아래 줄 버튼·안내 띠는 잠깐 숨겨서 캐릭터가 잘 보이게 */
+body.typing .composer .composer-row.small, body.typing #demoBanner, body.typing .panel, body.typing .gather-bar, body.typing #walkHud { display: none !important; }
+body.typing .composer { padding-top: 6px; padding-bottom: 6px; }
+.bubble.preview { border: 2px dashed #e0a92a; background: rgba(255,250,232,.97); }
+.bubble.preview small { color: #b07a2a; font-size: 10.5px; }
+/* 🎵 플레이어 잡는 곳 */
+.cd-player-head { cursor: grab; touch-action: none; user-select: none; }
+.cd-player-head:active { cursor: grabbing; }
+
+/* 🗺 지도 확대 */
+.map-zoom { display: flex; gap: 6px; align-items: center; margin: 4px 0 6px; }
+.map-zoom .icon-btn { width: 34px; height: 34px; border-radius: 50%; background: #f3eadc; font-size: 17px; }
+.map-wrap { touch-action: none; overflow: hidden; border-radius: 10px; }
+.map-wrap.zoomed { cursor: grab; }
+
+/* 🌿 큐티 산책 끝 */
+.qt-head { display: grid; gap: 2px; margin: 6px 0; } .qt-head b { font-size: 18px; color: #3a5a30; } .qt-head small { color: #8a6a44; font-weight: 700; }
+.qt-qs { display: grid; gap: 6px; margin: 6px 0; }
+.qt-q { display: grid; gap: 2px; text-align: left; border: 2px solid #e5ddcc; background: #fffdf7; border-radius: 12px; padding: 8px 10px; cursor: pointer; font: inherit; }
+.qt-q b { font-size: 12px; color: #6b8a63; } .qt-q span { font-size: 14px; }
+.qt-q.on { border-color: #6b8a63; background: #eef7e8; }
+.qt-pray { background: #fff6d6; border-radius: 12px; padding: 8px 12px; margin: 8px 0; } .qt-pray small { color: #a07818; font-weight: 700; } .qt-pray p { margin: 4px 0 0; font-family: "Gowun Batang", serif; }
+.qt-link { display: inline-block; margin: 2px 0 4px; text-decoration: none; }
+
+/* 🎶 토요일 자동 청음회 안내 팝업 · 설정 */
+.ls-promo { text-align: center; background: linear-gradient(180deg, #1b1f3a, #2f2a4f); color: #fff8e4; border: 3px solid #f2d98a; }
+.ls-promo h2 { color: #f2d98a; margin: 4px 0 6px; font-size: 20px; } .ls-promo .muted, .ls-promo .tiny-help { color: #cfc8ee; }
+.ls-promo .lp-moon { font-size: 40px; line-height: 1; }
+.lp-songs { text-align: left; margin: 8px auto; padding-left: 22px; max-width: 320px; color: #fff; } .lp-songs li { margin: 3px 0; }
+.ls-promo .btn.ghost { color: #fff8e4; border-color: #cfc8ee; }
+.ls-auto { background: #f3f0ff; border-radius: 12px; padding: 8px 12px; margin: 6px 0 10px; } .ls-auto-info { margin: 0; font-size: 14px; }
+.ls-auto-admin { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; font-size: 13px; }
+/* 🍡 특식 조각 · 트럭 타이밍 */
+.frag-line { font-size: 13px; margin: 4px 0 8px; } .frag-chip { display: inline-block; background: #fff4dc; border-radius: 99px; padding: 1px 8px; margin: 0 2px; font-weight: 700; }
+#cookBoard .cell.late em { color: #c0392b; } #cookBoard .cell.late { box-shadow: 0 0 0 3px #f2b632 inset; }
+#cookBoard .cell.burn { box-shadow: 0 0 0 3px #c0392b inset; filter: saturate(.6) brightness(.85); }
+#cookBoard .cell.burn em::after { content: " 🔥"; }
+/* 🗺 탐험 도장판 */
+.ex-card { max-height: 88vh; overflow: auto; }
+.ex-top { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 4px 0 8px; }
+.ex-stat { background: #eef7e8; border-radius: 12px; padding: 8px; text-align: center; display: grid; } .ex-stat b { font-size: 20px; color: #3a5a30; } .ex-stat span { font-size: 12px; color: #6b7a63; }
+.ex-course { list-style: none; padding: 0; margin: 4px 0; display: grid; gap: 6px; }
+.ex-course li { display: flex; align-items: center; gap: 8px; background: #fffdf7; border: 2px solid #e5ddcc; border-radius: 12px; padding: 6px 10px; }
+.ex-course li.ok { border-color: #6b8a63; background: #eef7e8; } .ex-course li .em { font-size: 20px; } .ex-course li b { flex: 1; }
+.ex-new { background: #d9483b; color: #fff; font-style: normal; font-size: 10px; font-weight: 700; border-radius: 6px; padding: 1px 5px; }
+.ex-ppl { background: #e8f0fb; border-radius: 99px; padding: 1px 7px; }
+.ex-gem { background: #fff6d6; border-radius: 12px; padding: 8px 10px; margin: 8px 0 4px; font-size: 14px; } .ex-gem.ok { background: #eef7e8; }
+.ex-boxgot { background: #f3f0ff; border-radius: 12px; padding: 8px 10px; }
+.ex-dex { display: flex; flex-wrap: wrap; gap: 4px; } .ex-dex .chip { font-size: 12px; } .ex-dex .chip.got { background: #eef7e8; border-color: #6b8a63; }
+.ex-goal { display: grid; grid-template-columns: 1fr 90px 46px; gap: 6px; align-items: center; font-size: 13px; margin: 4px 0; } .ex-goal.ok span { color: #3a5a30; font-weight: 700; }
+.ex-shop { list-style: none; padding: 0; display: grid; gap: 6px; } .ex-shop li { display: flex; gap: 8px; align-items: center; background: #fffdf7; border: 1px solid #e5ddcc; border-radius: 12px; padding: 6px 10px; }
+.ex-shop li .em { font-size: 22px; } .ex-shop li > div { flex: 1; display: grid; } .ex-shop small { font-size: 12px; }
+.ex-stats { font-size: 13px; padding-left: 20px; } .ex-stats li span { margin-right: 6px; }
+.ex-mapbar { display: block; width: 100%; text-align: left; border: 0; background: #eef7e8; color: #3a5a30; font: inherit; font-weight: 700; border-radius: 10px; padding: 8px 12px; margin: 4px 0 6px; cursor: pointer; }
+.map-svg .poi.ex-unseen circle:not(.ex-ring) { opacity: .55; }
+.map-svg .ex-ring { fill: none; stroke: #f2b632; stroke-width: .45; stroke-dasharray: 1 .6; }
+.map-svg .poi.ex-done .ex-ring { stroke: #4f9a5a; stroke-dasharray: none; }
+.map-svg .ex-newt { font-size: 1.3px; font-weight: 700; fill: #d9483b; }
+.map-svg .ex-pplt { font-size: 1.5px; font-weight: 700; fill: #2f4f8a; }

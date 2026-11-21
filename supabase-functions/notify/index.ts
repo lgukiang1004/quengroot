@@ -4,6 +4,8 @@
 //  - type "event": 관리자가 모임을 올리면 → 모임 알림 켠 사람들에게 (관리자 비밀번호 확인)
 //  - type "order": 🧀 치즈멜로바이트 새 주문 → "주문 알림 받기"를 켠 관리자 기기에만 (2026-11-17 추가)
 //                  새 주문 번호를 받아서 서버(order_notify_gate)가 '15분 안에 들어온, 아직 안 알린 주문'일 때만 한 번 보내요
+//  - type "listen": 🎶 청음회 30분 전 → 모임 알림 켠 사람들에게 (2026-11-20 추가)
+//                  누구나 부를 수 있지만 서버(listen_notify_gate)가 '15~40분 뒤 시작, 아직 안 알린 청음회'일 때만 한 번 보내요
 //  필요한 비밀 값(Secrets): VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_EMAIL
 //  (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY는 Supabase가 자동으로 넣어 줘요)
 // =====================================================================
@@ -49,6 +51,15 @@ Deno.serve(async (req) => {
       title = "🧀 치즈멜로바이트 새 주문!";
       body = `${clip(o.name, 20)}님 · ${parts} · $${o.total} · ${o.pickup === "contact" ? "연락해서 정하기" : "주일 교회 픽업"}`;
       col = "wants_order"; tag = "order-" + id;
+    } else if (b.type === "listen") {
+      const { data: rows, error } = await sb.rpc("listen_notify_gate");
+      if (error) return json({ error: error.message }, 500);
+      const e = Array.isArray(rows) ? rows[0] : rows;
+      if (!e) return json({ sent: 0, skipped: true });
+      const t = new Date(e.estart).toLocaleTimeString("ko-KR", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" });
+      title = `🎶 ${clip(e.etitle, 40)} · 30분 뒤 시작`;
+      body = `오늘 ${t} 마당 잔디밭에서 찬양 ${e.n}곡을 함께 들어요. 간식 챙겨 오세요 🍡`;
+      col = "wants_event"; tag = "listen-" + e.eid;
     } else return json({ error: "bad request" }, 400);
 
     const { data: subs, error: e2 } = await sb.from("push_subs").select("endpoint, sub, token").eq(col, true).limit(2000);
